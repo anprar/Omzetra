@@ -12,6 +12,10 @@ const db = new sqlite.Database(dbPath, (err) => {
   } else {
     console.log('Connected to database');
     db.exec(`
+      CREATE TABLE IF NOT EXISTS system_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
         name TEXT
@@ -42,6 +46,10 @@ const db = new sqlite.Database(dbPath, (err) => {
         password TEXT,
         role TEXT
       );
+      CREATE INDEX IF NOT EXISTS idx_sales_tanggal ON sales(tanggal);
+      CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
+      CREATE INDEX IF NOT EXISTS idx_sales_salesperson ON sales(sales_id);
       INSERT OR IGNORE INTO users (username, password, role)
       VALUES 
         ('admin', 'adminomzetra', 'admin'),

@@ -16,14 +16,43 @@ export async function GET(request) {
     const safeSortBy = validSortColumns.includes(sortBy) ? sortBy : 'tanggal';
     const safeOrder = ['ASC', 'DESC'].includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
 
-    // Construct search condition
-    let whereClause = '';
+    const startDate = searchParams.get('startDate') || '';
+    const endDate = searchParams.get('endDate') || '';
+    const salesId = searchParams.get('salesId') || '';
+    const customerId = searchParams.get('customerId') || '';
+    const productId = searchParams.get('productId') || '';
+
+    // Construct search and filter conditions
+    let whereClauses = [];
     const params = [];
+
     if (search.trim()) {
-      whereClause = `WHERE c.name LIKE ? OR p.name LIKE ? OR sl.name LIKE ?`;
+      whereClauses.push("(c.name LIKE ? OR p.name LIKE ? OR sl.name LIKE ?)");
       const searchWild = `%${search.trim()}%`;
       params.push(searchWild, searchWild, searchWild);
     }
+    if (startDate) {
+      whereClauses.push("s.tanggal >= ?");
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereClauses.push("s.tanggal <= ?");
+      params.push(endDate);
+    }
+    if (salesId) {
+      whereClauses.push("s.sales_id = ?");
+      params.push(salesId);
+    }
+    if (customerId) {
+      whereClauses.push("s.customer_id = ?");
+      params.push(customerId);
+    }
+    if (productId) {
+      whereClauses.push("s.product_id = ?");
+      params.push(productId);
+    }
+
+    const whereClause = whereClauses.length > 0 ? "WHERE " + whereClauses.join(" AND ") : "";
 
     // Get total count for pagination
     const countSql = `

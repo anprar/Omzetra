@@ -15,7 +15,16 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown
+  ArrowUpDown,
+  Calendar,
+  ShieldCheck,
+  CheckCircle,
+  AlertTriangle,
+  FileCode,
+  Layers,
+  ArrowRight,
+  Filter,
+  Info
 } from 'lucide-react';
 import UploadModal from '@/components/UploadModal';
 import AdminPanel from '@/components/AdminPanel';
@@ -36,6 +45,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Global Filter States
+  const [periodType, setPeriodType] = useState('all'); // 'all' | 'this-month' | '30-days' | 'this-quarter' | 'custom'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterSalesId, setFilterSalesId] = useState('');
+  const [filterCustomerId, setFilterCustomerId] = useState('');
+  const [filterProductId, setFilterProductId] = useState('');
+
+  // Interactive System Workflow Tab State
+  const [activeWorkflowTab, setActiveWorkflowTab] = useState('flow'); // 'flow' | 'risks' | 'arch'
+
   // Login Form States
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -50,10 +70,47 @@ export default function Dashboard() {
   const [txPage, setTxPage] = useState(1);
   const [txPagination, setTxPagination] = useState({ totalCount: 0, totalPages: 1 });
 
+  // Update dates based on period selection
+  useEffect(() => {
+    if (periodType === 'all') {
+      setStartDate('');
+      setEndDate('');
+    } else if (periodType === 'this-month') {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      setStartDate(firstDay.toISOString().split('T')[0]);
+      setEndDate(lastDay.toISOString().split('T')[0]);
+    } else if (periodType === '30-days') {
+      const now = new Date();
+      const past = new Date();
+      past.setDate(now.getDate() - 30);
+      setStartDate(past.toISOString().split('T')[0]);
+      setEndDate(now.toISOString().split('T')[0]);
+    } else if (periodType === 'this-quarter') {
+      const now = new Date();
+      const quarter = Math.floor(now.getMonth() / 3);
+      const firstDay = new Date(now.getFullYear(), quarter * 3, 1);
+      const lastDay = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+      setStartDate(firstDay.toISOString().split('T')[0]);
+      setEndDate(lastDay.toISOString().split('T')[0]);
+    }
+  }, [periodType]);
+
   const fetchDashboardData = async () => {
     try {
       setRefreshing(true);
-      const res = await fetch('/api/dashboard');
+      // Build query string with active filters
+      let queryParams = [];
+      if (startDate) queryParams.push(`startDate=${startDate}`);
+      if (endDate) queryParams.push(`endDate=${endDate}`);
+      if (filterSalesId) queryParams.push(`salesId=${filterSalesId}`);
+      if (filterCustomerId) queryParams.push(`customerId=${filterCustomerId}`);
+      if (filterProductId) queryParams.push(`productId=${filterProductId}`);
+
+      const queryString = queryParams.length > 0 ? '?' + queryParams.join('&') : '';
+      const res = await fetch(`/api/dashboard${queryString}`);
+      
       if (res.ok) {
         const result = await res.json();
         setData(result);
@@ -70,9 +127,21 @@ export default function Dashboard() {
 
   const fetchTransactions = async () => {
     try {
-      const res = await fetch(
-        `/api/transactions?search=${encodeURIComponent(txSearch)}&sortBy=${txSortBy}&order=${txOrder}&page=${txPage}&limit=10`
-      );
+      let queryParams = [
+        `search=${encodeURIComponent(txSearch)}`,
+        `sortBy=${txSortBy}`,
+        `order=${txOrder}`,
+        `page=${txPage}`,
+        `limit=10`
+      ];
+      if (startDate) queryParams.push(`startDate=${startDate}`);
+      if (endDate) queryParams.push(`endDate=${endDate}`);
+      if (filterSalesId) queryParams.push(`salesId=${filterSalesId}`);
+      if (filterCustomerId) queryParams.push(`customerId=${filterCustomerId}`);
+      if (filterProductId) queryParams.push(`productId=${filterProductId}`);
+
+      const queryString = '?' + queryParams.join('&');
+      const res = await fetch(`/api/transactions${queryString}`);
       if (res.ok) {
         const result = await res.json();
         setTransactions(result.transactions || []);
@@ -82,6 +151,13 @@ export default function Dashboard() {
       console.error('Error fetching transactions:', err);
     }
   };
+
+  // Trigger data fetch when filters change
+  useEffect(() => {
+    if (currentUser) {
+      fetchDashboardData();
+    }
+  }, [startDate, endDate, filterSalesId, filterCustomerId, filterProductId, currentUser]);
 
   // Trigger search/sort fetch
   useEffect(() => {
@@ -94,7 +170,6 @@ export default function Dashboard() {
     const session = sessionStorage.getItem('omzetra_session');
     if (session) {
       setCurrentUser(JSON.parse(session));
-      fetchDashboardData();
     } else {
       setLoading(false);
     }
@@ -123,8 +198,6 @@ export default function Dashboard() {
         setCurrentUser(result.user);
         sessionStorage.setItem('omzetra_session', JSON.stringify(result.user));
         setLoading(true);
-        // Fetch dashboard data immediately after login
-        await fetchDashboardData();
       } else {
         setLoginError(result.error || 'Username atau Password salah');
       }
@@ -230,7 +303,11 @@ export default function Dashboard() {
     );
   }
 
-  const hasData = data && data.metrics && data.metrics.totalOmzet > 0;
+  const hasData = data && data.metrics && (data.metrics.totalOmzet > 0 || data.metrics.totalTransactions > 0);
+
+  // Prepare product lists separated by Omzet and Quantity
+  const productsByOmzet = data?.topProducts || [];
+  const productsByQty = data?.topProducts ? [...data.topProducts].sort((a, b) => b.total_qty - a.total_qty) : [];
 
   return (
     <main className="dashboard-container">
@@ -248,8 +325,11 @@ export default function Dashboard() {
             <path d="M18 13H22V17" stroke="url(#logoGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <div>
-            <h1>Omzetra Dashboard</h1>
-            <p>Sistem Analisis Penjualan Harian dan Insight Otomatis</p>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              Omzetra Dashboard 
+              <span style={{ background: 'var(--color-primary-glow)', border: '1px solid var(--color-primary)', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>AI Activation Hub</span>
+            </h1>
+            <p>Sistem Analisis Penjualan Strategis, Deteksi Anomali, dan Validasi Data Terpadu</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -288,6 +368,131 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {/* GLOBAL FILTER BAR */}
+      {hasData && (
+        <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1rem', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>
+            <Filter size={16} style={{ color: 'var(--color-primary)' }} />
+            <span>FILTER ANALISIS</span>
+          </div>
+
+          <div style={{ height: '20px', width: '1px', background: 'var(--border-color)', display: 'inline-block' }}></div>
+
+          {/* Period Type Selection */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PERIODE</label>
+            <select 
+              value={periodType} 
+              onChange={(e) => setPeriodType(e.target.value)}
+              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+            >
+              <option value="all">Semua Waktu</option>
+              <option value="this-month">Bulan Ini</option>
+              <option value="30-days">30 Hari Terakhir</option>
+              <option value="this-quarter">Kuartal Ini</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+
+          {/* Custom Dates Inputs */}
+          {periodType === 'custom' && (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>DARI TANGGAL</label>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{ padding: '0.35rem 0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                />
+              </div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '12px' }}>s/d</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>SAMPAI TANGGAL</label>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{ padding: '0.35rem 0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Salesperson Filter */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>SALESPERSON</label>
+            <select 
+              value={filterSalesId} 
+              onChange={(e) => setFilterSalesId(e.target.value)}
+              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '130px' }}
+            >
+              <option value="">Semua Sales</option>
+              {data?.salesPerformance?.map(s => {
+                const cleanId = s.sales.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                return (
+                  <option key={s.sales} value={cleanId ? `SLS-${cleanId}` : ''}>{s.sales}</option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Customer Filter */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PELANGGAN</label>
+            <select 
+              value={filterCustomerId} 
+              onChange={(e) => setFilterCustomerId(e.target.value)}
+              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '145px' }}
+            >
+              <option value="">Semua Pelanggan</option>
+              {data?.topCustomers?.map(c => {
+                const cleanId = c.customer.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                return (
+                  <option key={c.customer} value={cleanId ? `CST-${cleanId}` : ''}>{c.customer}</option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Product Filter */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PRODUK</label>
+            <select 
+              value={filterProductId} 
+              onChange={(e) => setFilterProductId(e.target.value)}
+              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '150px' }}
+            >
+              <option value="">Semua Produk</option>
+              {data?.topProducts?.map(p => {
+                const cleanId = p.produk.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                return (
+                  <option key={p.produk} value={cleanId ? `PRD-${cleanId}` : ''}>{p.produk}</option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {(periodType !== 'all' || filterSalesId || filterCustomerId || filterProductId) && (
+            <button 
+              className="btn btn-secondary"
+              onClick={() => {
+                setPeriodType('all');
+                setStartDate('');
+                setEndDate('');
+                setFilterSalesId('');
+                setFilterCustomerId('');
+                setFilterProductId('');
+              }}
+              style={{ padding: '0.4rem 0.75rem', height: 'auto', fontSize: '0.75rem', marginTop: '12px', marginLeft: 'auto' }}
+            >
+              Reset Filter
+            </button>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '2rem 0' }}>
@@ -334,13 +539,66 @@ export default function Dashboard() {
       ) : (
         // Dashboard Content
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* KPI Row */}
-          <KPIGrid metrics={data.metrics} />
+          
+          {/* KPI Row (Now with Growth Rates) */}
+          <KPIGrid metrics={data.metrics} growthMetrics={data.growthMetrics} />
 
-          {/* Automated Insights */}
+          {/* DATA INTEGRITY & UPLOAD VALIDATION PANEL */}
+          {data?.lastUploadValidation && (
+            <div className="glass-card" style={{ border: '1px solid rgba(16, 185, 129, 0.2)', background: 'rgba(16, 185, 129, 0.01)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                <h3 className="widget-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
+                  <ShieldCheck size={18} style={{ color: 'var(--color-success)' }} />
+                  Panel Validasi & Integritas Data (Last Upload Status)
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Diunggah pada: {new Date(data.lastUploadValidation.timestamp).toLocaleString('id-ID')}
+                </span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Baris Terbaca</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
+                    {data.lastUploadValidation.totalRows} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>baris</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Transaksi Valid (Imported)</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-success)', marginTop: '0.25rem' }}>
+                    {data.lastUploadValidation.validRows} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>sukses</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-warning)', fontWeight: 600 }}>Duplikat Diabaikan</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-warning)', marginTop: '0.25rem' }}>
+                    {data.lastUploadValidation.duplicateCount} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>diabaikan</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-danger)', fontWeight: 600 }}>Data Kosong / Cacat</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-danger)', marginTop: '0.25rem' }}>
+                    {data.lastUploadValidation.emptyCells + data.lastUploadValidation.invalidDates} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>baris</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem', background: 'rgba(255,255,255,0.01)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <CheckCircle size={14} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
+                <span>
+                  <b>Pemeriksaan Kolom Wajib:</b> Tanggal ({data.lastUploadValidation.headersStatus?.tanggal ? '✓ Tersedia' : '✗ Hilang'}), Pelanggan ({data.lastUploadValidation.headersStatus?.customer ? '✓ Tersedia' : '✗ Hilang'}), Produk ({data.lastUploadValidation.headersStatus?.produk ? '✓ Tersedia' : '✗ Hilang'}), Sales ({data.lastUploadValidation.headersStatus?.sales ? '✓ Tersedia' : '✗ Hilang'}), Qty ({data.lastUploadValidation.headersStatus?.qty ? '✓ Tersedia' : '✗ Hilang'}), Harga ({data.lastUploadValidation.headersStatus?.harga ? '✓ Tersedia' : '✗ Hilang'}).
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Automated Insights with Strategic Business Advice */}
           <AutomatedInsights insights={data.insights} />
 
-          {/* Charts & Graphs Row */}
+          {/* Charts & Graphs Row (Dynamic Multidimensional Chart) */}
           <div className="widgets-grid">
             <div className="glass-card">
               <h3 className="widget-title">
@@ -349,7 +607,7 @@ export default function Dashboard() {
               </h3>
               <TrendChart 
                 trendData={data.salesTrend} 
-                productsData={data.topProducts}
+                productsData={productsByOmzet}
                 salesData={data.salesPerformance}
                 customersData={data.topCustomers}
               />
@@ -357,21 +615,135 @@ export default function Dashboard() {
 
             <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ padding: '1rem', background: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ padding: '1rem', background: 'rgba(6, 182, 212, 0.03)', border: '1px solid rgba(6, 182, 212, 0.1)', borderRadius: 'var(--radius-md)' }}>
                   <h4 style={{ color: 'var(--color-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Total Customer Aktif</h4>
                   <p style={{ fontSize: '1.75rem', fontWeight: 700, fontFamily: 'var(--font-display)' }}>{data.topCustomers.length} Customer</p>
                 </div>
-                <div style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                  <h4 style={{ color: 'var(--color-primary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Total Produk Terjual</h4>
-                  <p style={{ fontSize: '1.75rem', fontWeight: 700, fontFamily: 'var(--font-display)' }}>
-                    {data.topProducts.reduce((acc, p) => acc + p.total_qty, 0)} Pcs
-                  </p>
+                <div style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.03)', border: '1px solid rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                  <h4 style={{ color: 'var(--color-primary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Total Jenis Produk Terjual</h4>
+                  <p style={{ fontSize: '1.75rem', fontWeight: 700, fontFamily: 'var(--font-display)' }}>{data.topProducts.length} Varian Produk</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Rankings & Tables Grid */}
+          {/* INTERACTIVE SYSTEM ARCHITECTURE WORKFLOW & TECH-STACK HUB (FOR CASE STUDY PRESENTATION) */}
+          <div className="glass-card" style={{ border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <h3 className="widget-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Layers size={18} style={{ color: 'var(--color-primary)' }} />
+                AI Activation Specialist: Rancangan Solusi & Manajemen Risiko
+              </h3>
+
+              <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+                <button 
+                  onClick={() => setActiveWorkflowTab('flow')} 
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: activeWorkflowTab === 'flow' ? 'var(--color-primary)' : 'transparent', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Alur Kerja Sistem
+                </button>
+                <button 
+                  onClick={() => setActiveWorkflowTab('risks')} 
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: activeWorkflowTab === 'risks' ? 'var(--color-primary)' : 'transparent', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Analisis Risiko & Mitigasi
+                </button>
+                <button 
+                  onClick={() => setActiveWorkflowTab('arch')} 
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: activeWorkflowTab === 'arch' ? 'var(--color-primary)' : 'transparent', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Pendekatan Teknologi
+                </button>
+              </div>
+            </div>
+
+            {activeWorkflowTab === 'flow' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Berikut adalah rancangan alur kerja otomatis dari input file penjualan berantakan hingga penayangan rekomendasi keputusan bisnis strategis bagi manajemen:
+                </p>
+                
+                {/* Visual workflow nodes */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '1rem 0' }}>
+                  {[
+                    { step: '1', title: 'Upload File', desc: 'File Excel/CSV / Google Sheets', icon: FileSpreadsheet, color: 'rgba(6, 182, 212, 0.15)' },
+                    { step: '2', title: 'Validation Engine', desc: 'Auto-checks & deduplication', icon: ShieldCheck, color: 'rgba(16, 185, 129, 0.15)' },
+                    { step: '3', title: 'Relational Warehouse', desc: 'Normal 3NF SQL storage', icon: FileCode, color: 'rgba(139, 92, 246, 0.15)' },
+                    { step: '4', title: 'Growth Comparator', desc: 'Period-over-period statistics', icon: BarChart3, color: 'rgba(245, 158, 11, 0.15)' },
+                    { step: '5', title: 'AI Recommendation', desc: 'Temuan ➔ Dampak ➔ Solusi', icon: Sparkles, color: 'var(--color-primary-glow)' }
+                  ].map((nd, idx) => (
+                    <React.Fragment key={nd.step}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '160px', padding: '1rem', background: nd.color, border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', textAlign: 'center', position: 'relative' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem', color: '#fff', marginBottom: '0.5rem' }}>{nd.step}</div>
+                        <nd.icon size={20} style={{ color: '#fff', marginBottom: '0.5rem' }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#fff', marginBottom: '0.25rem' }}>{nd.title}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>{nd.desc}</div>
+                      </div>
+                      {idx < 4 && <ArrowRight size={18} style={{ color: 'var(--text-muted)', margin: '0 0.25rem' }} />}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeWorkflowTab === 'risks' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <AlertTriangle size={16} />
+                    <span>Risiko 1: Format Data Tidak Konsisten</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    <b>Dampak:</b> Kesalahan kalkulasi KPI dan anjloknya performa database saat parsing cell kosong atau format tanggal acak.<br/>
+                    <b>Mitigasi:</b> Implementasi auto-slugification pada ID master data, pembersihan karakter (*trim casing*), sensor data cacat pra-simpan, serta panel validasi log unggah yang informatif.
+                  </p>
+                </div>
+
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <AlertTriangle size={16} />
+                    <span>Risiko 2: Target Quota Bias</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    <b>Dampak:</b> Target kuota penjualan statis dari file CSV cenderung terlampaui secara drastis (bias performa) sehingga evaluasi bonus terganggu.<br/>
+                    <b>Mitigasi:</b> Menyediakan portal penyuntingan target dinamis eksklusif Admin Panel untuk mengkalibrasi besaran target sesuai kondisi riil pasar.
+                  </p>
+                </div>
+
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-secondary)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <AlertTriangle size={16} />
+                    <span>Risiko 3: Skalabilitas Penyimpanan</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    <b>Dampak:</b> Kueri analisis harian melambat seiring bertambahnya volume data dari ribuan baris menjadi jutaan transaksi.<br/>
+                    <b>Mitigasi:</b> Pengindeksan terpadu (*composite indexes*) pada kolom relasional kunci (`tanggal`, `sales_id`, etc.) serta struktur arsitektur SQL yang kompatibel untuk migrasi tanpa hambatan ke PostgreSQL.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeWorkflowTab === 'arch' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Pendekatan teknologi dashboard dirancang secara efisien menggunakan tumpukan teknologi modern untuk skalabilitas tinggi:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.75rem' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                    <b>Frontend & Core Framework:</b> Next.js dengan server-rendered API dynamic routing untuk pengolahan kueri SQL di sisi server secara aman.
+                  </div>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                    <b>Datastore & Relational Warehouse:</b> SQLite local database menggunakan normalisasi relasional bentuk ketiga (3NF) untuk integritas referensi data master.
+                  </div>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                    <b>Data Parsing Engine:</b> library JS xlsx (SheetJS) terintegrasi pada backend serverless route untuk konversi instan berkas biner `.xlsx` menjadi baris JSON.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Rankings Grid (Split Top Products by Revenue vs Volume) */}
           <div className="widgets-grid">
             <TopList 
               title="Top Customer (Omzet Terbesar)" 
@@ -379,14 +751,25 @@ export default function Dashboard() {
               data={data.topCustomers} 
               type="customer" 
             />
-            <TopList 
-              title="Top Produk (Omzet Terbesar)" 
-              icon={ShoppingBag} 
-              data={data.topProducts} 
-              type="product" 
-            />
+            
+            {/* Split Product Cards: Omzet vs Volume */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+              <TopList 
+                title="Top Produk Berdasarkan Omzet (Revenue)" 
+                icon={ShoppingBag} 
+                data={productsByOmzet} 
+                type="product" 
+              />
+              <TopList 
+                title="Top Produk Berdasarkan Kuantitas (Volume)" 
+                icon={ShoppingBag} 
+                data={productsByQty} 
+                type="product" 
+              />
+            </div>
           </div>
 
+          {/* Sales Performance table */}
           <SalesPerformanceTable data={data.salesPerformance} />
 
           {/* Widget: Transaction History Table */}
@@ -412,7 +795,7 @@ export default function Dashboard() {
 
             {transactions.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '3rem 0' }}>
-                Tidak ada transaksi ditemukan.
+                Tidak ada transaksi ditemukan pada periode terpilih.
               </p>
             ) : (
               <>

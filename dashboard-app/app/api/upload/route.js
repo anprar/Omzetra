@@ -116,24 +116,43 @@ export async function POST(request) {
     // The admin has a dedicated "Reset Data Penjualan" button in the Admin Panel if they want a clean database.
     const { query } = require('@/lib/db');
 
+    let totalRows = rows.length;
+    let validRows = 0;
+    let emptyCells = 0;
+    let duplicateCount = 0;
+    let invalidDates = 0;
+    let missingColumns = 0;
+    
+    // Check headers presence on the first row
+    const firstRowKeys = Object.keys(rows[0]);
+    const hasTanggal = firstRowKeys.some(k => ['tanggal', 'date'].includes(k));
+    const hasCustomer = firstRowKeys.some(k => ['customer', 'pelanggan', 'nama_customer', 'customer_name'].includes(k));
+    const hasProduct = firstRowKeys.some(k => ['produk', 'product', 'barang', 'nama_produk', 'product_name'].includes(k));
+    const hasSales = firstRowKeys.some(k => ['sales', 'salesperson', 'karyawan', 'nama_sales', 'sales_name'].includes(k));
+    const hasQty = firstRowKeys.some(k => ['qty', 'quantity', 'jumlah'].includes(k));
+    const hasHarga = firstRowKeys.some(k => ['harga', 'price', 'harga_satuan'].includes(k));
+
     for (const row of rows) {
       // Find columns (case-insensitive checks)
       const tanggal = row.tanggal || row.date || '';
       
       // Customer details
       const customerName = row.customer || row.pelanggan || row.nama_customer || row.customer_name || '';
-      const customerId = row.customer_id || row.id_customer || row.pelanggan_id || generateSlug('CST', customerName);
+      const customerId = row.customer_id || row.id_customer || row.pelanggan_id || (customerName ? generateSlug('CST', customerName) : '');
       
       // Product details
       const productName = row.produk || row.product || row.barang || row.nama_produk || row.product_name || '';
-      const productId = row.product_id || row.produk_id || row.id_produk || row.id_barang || row.barang_id || generateSlug('PRD', productName);
+      const productId = row.product_id || row.produk_id || row.id_produk || row.id_barang || row.barang_id || (productName ? generateSlug('PRD', productName) : '');
       
       // Sales details
       const salesName = row.sales || row.salesperson || row.karyawan || row.nama_sales || row.sales_name || '';
-      const salesId = row.sales_id || row.id_sales || row.karyawan_id || row.salesperson_id || generateSlug('SLS', salesName);
+      const salesId = row.sales_id || row.id_sales || row.karyawan_id || row.salesperson_id || (salesName ? generateSlug('SLS', salesName) : '');
       
-      const qty = parseInt(row.qty || row.quantity || row.jumlah || '0', 10);
-      const harga = parseFloat(row.harga || row.price || row.harga_satuan || '0');
+      const qtyStr = row.qty || row.quantity || row.jumlah || '';
+      const hargaStr = row.harga || row.price || row.harga_satuan || '';
+      
+      const qty = parseInt(qtyStr || '0', 10);
+      const harga = parseFloat(hargaStr || '0');
       
       // Compute total omzet if not directly provided
       let omzet = parseFloat(row.omzet || row.revenue || row.total || '0');
@@ -143,42 +162,83 @@ export async function POST(request) {
       
       const target = parseFloat(row.target || row.target_penjualan || '0');
       
-      if (tanggal && customerName && productName && salesName) {
-        // Auto-create Master Data (Insert or Ignore to protect custom settings)
+      // Validate mandatory fields
+      if (!tanggal || !customerName || !productName || !salesName || !qtyStr || !hargaStr) {
+        emptyCells++;
+        continue;
+      }
+
+      // Validate Date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(tanggal)) {
+        invalidDates++;
+        continue;
+      }
+      
+      // Auto-create Master Data (Insert or Ignore to protect custom settings)
+      await run(
+        `INSERT OR IGNORE INTO customers (id, name) VALUES (?, ?)`,
+        [customerId, customerName]
+      );
+      
+      await run(
+        `INSERT OR IGNORE INTO products (id, name, price) VALUES (?, ?, ?)`,
+        [productId, productName, harga]
+      );
+      
+      await run(
+        `INSERT OR IGNORE INTO salespeople (id, name, target) VALUES (?, ?, ?)`,
+        [salesId, salesName, target]
+      );
+      
+      // Prevent duplicate transaction entries: check if exactly the same record already exists
+      const existingTx = await query(
+        `SELECT id FROM sales 
+         WHERE tanggal = ? AND customer_id = ? AND product_id = ? AND sales_id = ? AND qty = ? AND harga = ?`,
+        [tanggal, customerId, productId, salesId, qty, harga]
+      );
+      
+      if (existingTx.length === 0) {
+        // Insert transaction record referencing the Master Data IDs
         await run(
-          `INSERT OR IGNORE INTO customers (id, name) VALUES (?, ?)`,
-          [customerId, customerName]
+          `INSERT INTO sales (tanggal, customer_id, product_id, sales_id, qty, harga, omzet)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [tanggal, customerId, productId, salesId, qty, harga, omzet]
         );
-        
-        await run(
-          `INSERT OR IGNORE INTO products (id, name, price) VALUES (?, ?, ?)`,
-          [productId, productName, harga]
-        );
-        
-        await run(
-          `INSERT OR IGNORE INTO salespeople (id, name, target) VALUES (?, ?, ?)`,
-          [salesId, salesName, target]
-        );
-        
-        // Prevent duplicate transaction entries: check if exactly the same record already exists
-        const existingTx = await query(
-          `SELECT id FROM sales 
-           WHERE tanggal = ? AND customer_id = ? AND product_id = ? AND sales_id = ? AND qty = ? AND harga = ?`,
-          [tanggal, customerId, productId, salesId, qty, harga]
-        );
-        
-        if (existingTx.length === 0) {
-          // Insert transaction record referencing the Master Data IDs
-          await run(
-            `INSERT INTO sales (tanggal, customer_id, product_id, sales_id, qty, harga, omzet)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [tanggal, customerId, productId, salesId, qty, harga, omzet]
-          );
-        }
+        validRows++;
+      } else {
+        duplicateCount++;
       }
     }
+
+    // Save validation log to database for persistence
+    const validationLog = {
+      timestamp: new Date().toISOString(),
+      totalRows,
+      validRows,
+      emptyCells,
+      duplicateCount,
+      invalidDates,
+      headersStatus: {
+        tanggal: hasTanggal,
+        customer: hasCustomer,
+        produk: hasProduct,
+        sales: hasSales,
+        qty: hasQty,
+        harga: hasHarga
+      }
+    };
+
+    await run(
+      `INSERT OR REPLACE INTO system_metadata (key, value) VALUES (?, ?)`,
+      ['last_upload_validation', JSON.stringify(validationLog)]
+    );
     
-    return NextResponse.json({ success: true, count: rows.length });
+    return NextResponse.json({ 
+      success: true, 
+      count: validRows,
+      validation: validationLog
+    });
   } catch (error) {
     console.error('Error handling upload:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

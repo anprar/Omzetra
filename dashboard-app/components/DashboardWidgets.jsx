@@ -20,51 +20,79 @@ const formatRupiah = (val) => {
   }).format(val);
 };
 
-export function KPIGrid({ metrics }) {
-  const { totalOmzet, totalTarget, achievementPercent } = metrics;
-  
+export function KPIGrid({ metrics, growthMetrics = {} }) {
+  const { totalOmzet, totalTarget, achievementPercent, totalQty, totalTransactions } = metrics;
+  const { hasPreviousPeriod, omzetGrowth, qtyGrowth, transactionsGrowth } = growthMetrics;
+
+  const renderGrowthBadge = (growthVal) => {
+    if (!hasPreviousPeriod) return null;
+    const isPositive = growthVal >= 0;
+    const color = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
+    const text = `${isPositive ? '▲' : '▼'} ${Math.abs(growthVal).toFixed(1)}%`;
+
+    return (
+      <span style={{ 
+        color, 
+        background: isPositive ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+        border: `1px solid ${isPositive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+        padding: '2px 6px',
+        borderRadius: 'var(--radius-sm)',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.15rem'
+      }}>
+        {text}
+      </span>
+    );
+  };
+
   return (
-    <div className="kpi-grid">
-      <div className="glass-card kpi-card">
+    <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', width: '100%' }}>
+      
+      {/* 1. Total Omzet */}
+      <div className="glass-card kpi-card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="kpi-title">Total Omzet</div>
-            <div className="kpi-value" style={{ color: 'var(--text-primary)' }}>
+            <div className="kpi-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Omzet</div>
+            <div className="kpi-value" style={{ color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0' }}>
               {formatRupiah(totalOmzet)}
             </div>
           </div>
-          <div style={{ padding: '8px', background: 'var(--color-primary-glow)', borderRadius: 'var(--radius-sm)', color: 'var(--color-primary)' }}>
-            <TrendingUp size={20} />
+          <div style={{ padding: '6px', background: 'var(--color-primary-glow)', borderRadius: 'var(--radius-sm)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center' }}>
+            <TrendingUp size={18} />
           </div>
         </div>
-        <div className="kpi-meta">
-          <span style={{ color: 'var(--color-success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>
-            <ArrowUpRight size={14} /> Pencapaian
+        <div className="kpi-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          {renderGrowthBadge(omzetGrowth)}
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            {hasPreviousPeriod ? 'vs periode lalu' : 'dari target kuota'}
           </span>
-          <span style={{ color: 'var(--text-secondary)' }}>dari total target</span>
         </div>
       </div>
 
-      <div className="glass-card kpi-card" style={{ '--color-primary': 'var(--color-secondary)' }}>
+      {/* 2. Target Penjualan */}
+      <div className="glass-card kpi-card" style={{ padding: '1.25rem', '--color-primary': 'var(--color-secondary)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="kpi-title">Target Penjualan</div>
-            <div className="kpi-value" style={{ color: 'var(--text-primary)' }}>
+            <div className="kpi-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Target Penjualan</div>
+            <div className="kpi-value" style={{ color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0' }}>
               {formatRupiah(totalTarget)}
             </div>
           </div>
-          <div style={{ padding: '8px', background: 'var(--color-secondary-glow)', borderRadius: 'var(--radius-sm)', color: 'var(--color-secondary)' }}>
-            <Target size={20} />
+          <div style={{ padding: '6px', background: 'var(--color-secondary-glow)', borderRadius: 'var(--radius-sm)', color: 'var(--color-secondary)', display: 'flex', alignItems: 'center' }}>
+            <Target size={18} />
           </div>
         </div>
-        <div className="kpi-meta" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.85rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Progress Target</span>
-            <span style={{ fontWeight: 600, color: achievementPercent >= 100 ? 'var(--color-success)' : 'var(--color-secondary)' }}>
+        <div className="kpi-meta" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', width: '100%', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.75rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Progress</span>
+            <span style={{ fontWeight: 700, color: achievementPercent >= 100 ? 'var(--color-success)' : 'var(--color-secondary)' }}>
               {achievementPercent.toFixed(1)}%
             </span>
           </div>
-          <div className="progress-container">
+          <div className="progress-container" style={{ margin: 0, height: '4px' }}>
             <div 
               className="progress-bar" 
               style={{ 
@@ -77,6 +105,49 @@ export function KPIGrid({ metrics }) {
           </div>
         </div>
       </div>
+
+      {/* 3. Kuantitas Terjual */}
+      <div className="glass-card kpi-card" style={{ padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div className="kpi-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Volume Terjual (Qty)</div>
+            <div className="kpi-value" style={{ color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0' }}>
+              {totalQty.toLocaleString('id-ID')} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>Pcs</span>
+            </div>
+          </div>
+          <div style={{ padding: '6px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: 'var(--radius-sm)', color: 'var(--color-success)', display: 'flex', alignItems: 'center' }}>
+            <ShoppingBag size={18} />
+          </div>
+        </div>
+        <div className="kpi-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          {renderGrowthBadge(qtyGrowth)}
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            {hasPreviousPeriod ? 'vs periode lalu' : 'volume unit riil'}
+          </span>
+        </div>
+      </div>
+
+      {/* 4. Jumlah Transaksi */}
+      <div className="glass-card kpi-card" style={{ padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div className="kpi-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Transaksi</div>
+            <div className="kpi-value" style={{ color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0' }}>
+              {totalTransactions.toLocaleString('id-ID')} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>Nota</span>
+            </div>
+          </div>
+          <div style={{ padding: '6px', background: 'rgba(245, 158, 11, 0.05)', borderRadius: 'var(--radius-sm)', color: 'var(--color-warning)', display: 'flex', alignItems: 'center' }}>
+            <Users size={18} />
+          </div>
+        </div>
+        <div className="kpi-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          {renderGrowthBadge(transactionsGrowth)}
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            {hasPreviousPeriod ? 'vs periode lalu' : 'frekuensi transaksi'}
+          </span>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -551,16 +622,72 @@ export function AutomatedInsights({ insights }) {
     <div className="glass-card">
       <h3 className="widget-title">
         <Sparkles size={18} style={{ color: 'var(--color-primary)' }} />
-        Insight Otomatis
+        AI Business Intelligence & Strategic Recommendations
       </h3>
       
-      <div className="insight-box">
-        {insights.map((insight, index) => (
-          <div key={index} className="insight-item">
-            <Sparkles size={14} className="insight-icon" />
-            <span dangerouslySetInnerHTML={{ __html: insight }} />
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+        {insights.map((insight, index) => {
+          const isObj = typeof insight === 'object' && insight !== null;
+          const type = isObj ? insight.type : 'info';
+          const title = isObj ? insight.title : 'Insight Otomatis';
+          const text = isObj ? insight.text : insight;
+
+          // Define semantic styling variables
+          let cardBg = 'rgba(6, 182, 212, 0.03)';
+          let borderCol = 'rgba(6, 182, 212, 0.15)';
+          let accentCol = 'var(--color-secondary)';
+
+          if (type === 'danger') {
+            cardBg = 'rgba(239, 68, 68, 0.04)';
+            borderCol = 'rgba(239, 68, 68, 0.25)';
+            accentCol = 'var(--color-danger)';
+          } else if (type === 'warning') {
+            cardBg = 'rgba(245, 158, 11, 0.04)';
+            borderCol = 'rgba(245, 158, 11, 0.25)';
+            accentCol = 'var(--color-warning)';
+          } else if (type === 'success') {
+            cardBg = 'rgba(16, 185, 129, 0.04)';
+            borderCol = 'rgba(16, 185, 129, 0.25)';
+            accentCol = 'var(--color-success)';
+          }
+
+          return (
+            <div 
+              key={index} 
+              style={{ 
+                background: cardBg, 
+                border: `1px solid ${borderCol}`, 
+                borderRadius: 'var(--radius-md)', 
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: type === 'danger' || type === 'warning' ? '0 4px 20px -5px rgba(0,0,0,0.3)' : 'none'
+              }}
+            >
+              {/* Left accent indicator */}
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: accentCol }}></div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: accentCol, fontWeight: 700, fontSize: '0.9rem' }}>
+                <Sparkles size={14} style={{ flexShrink: 0 }} />
+                <span>{title}</span>
+              </div>
+              
+              <div 
+                className="insight-text" 
+                style={{ 
+                  fontSize: '0.825rem', 
+                  color: 'var(--text-secondary)', 
+                  lineHeight: '1.5',
+                  textAlign: 'justify' 
+                }} 
+                dangerouslySetInnerHTML={{ __html: text }} 
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

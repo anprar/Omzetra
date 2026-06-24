@@ -11,33 +11,47 @@ const db = new sqlite.Database(dbPath, (err) => {
     console.error('Could not connect to database', err);
   } else {
     console.log('Connected to database');
-    db.run(`
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      );
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        price REAL
+      );
+      CREATE TABLE IF NOT EXISTS salespeople (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        target REAL
+      );
       CREATE TABLE IF NOT EXISTS sales (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tanggal TEXT,
-        customer TEXT,
-        produk TEXT,
-        sales TEXT,
+        customer_id TEXT,
+        product_id TEXT,
+        sales_id TEXT,
         qty INTEGER,
         harga REAL,
-        omzet REAL,
-        target REAL
-      )
-    `);
-    db.run(`
+        omzet REAL
+      );
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
         role TEXT
-      )
-    `, () => {
-      db.run(`
-        INSERT OR IGNORE INTO users (username, password, role)
-        VALUES 
-          ('admin', 'adminomzetra', 'admin'),
-          ('user', '12345', 'user')
-      `);
+      );
+      INSERT OR IGNORE INTO users (username, password, role)
+      VALUES 
+        ('admin', 'adminomzetra', 'admin'),
+        ('user', '12345', 'user');
+    `, (err) => {
+      if (err) {
+        console.error('Error initializing database schema:', err);
+      } else {
+        console.log('Database schema initialized successfully');
+      }
     });
   }
 });

@@ -6,9 +6,8 @@ export async function GET() {
     // 1. Basic metrics (Total Omzet, Total Target)
     const metricsResult = await query(
       `SELECT 
-        SUM(omzet) as total_omzet, 
-        SUM(target) as total_target 
-       FROM sales`
+        (SELECT SUM(omzet) FROM sales) as total_omzet, 
+        (SELECT SUM(target) FROM salespeople) as total_target`
     );
     const totalOmzet = metricsResult[0]?.total_omzet || 0;
     const totalTarget = metricsResult[0]?.total_target || 0;
@@ -16,39 +15,39 @@ export async function GET() {
 
     // 2. Top Customers
     const topCustomers = await query(
-      `SELECT customer, SUM(omzet) as total_omzet 
-       FROM sales 
-       WHERE customer != '' 
-       GROUP BY customer 
+      `SELECT c.name as customer, SUM(s.omzet) as total_omzet 
+       FROM sales s
+       JOIN customers c ON s.customer_id = c.id
+       GROUP BY s.customer_id 
        ORDER BY total_omzet DESC 
        LIMIT 5`
     );
 
     // 3. Top Products
     const topProducts = await query(
-      `SELECT produk, SUM(qty) as total_qty, SUM(omzet) as total_omzet 
-       FROM sales 
-       WHERE produk != '' 
-       GROUP BY produk 
+      `SELECT p.name as produk, SUM(s.qty) as total_qty, SUM(s.omzet) as total_omzet 
+       FROM sales s
+       JOIN products p ON s.product_id = p.id
+       GROUP BY s.product_id 
        ORDER BY total_omzet DESC 
        LIMIT 5`
     );
 
     // 4. Sales Performance
     const salesPerformance = await query(
-      `SELECT sales, SUM(omzet) as total_omzet, SUM(target) as total_target 
-       FROM sales 
-       WHERE sales != '' 
-       GROUP BY sales 
+      `SELECT sl.name as sales, SUM(s.omzet) as total_omzet, sl.target as total_target 
+       FROM salespeople sl
+       LEFT JOIN sales s ON s.sales_id = sl.id
+       GROUP BY sl.id 
        ORDER BY total_omzet DESC`
     );
 
     // 5. Monthly Sales Trend (for chart)
     const salesTrend = await query(
-      `SELECT tanggal, SUM(omzet) as total_omzet, SUM(target) as total_target 
-       FROM sales 
-       GROUP BY tanggal 
-       ORDER BY tanggal ASC`
+      `SELECT s.tanggal, SUM(s.omzet) as total_omzet 
+       FROM sales s
+       GROUP BY s.tanggal 
+       ORDER BY s.tanggal ASC`
     );
 
     // 6. Automated Insights Generation

@@ -40,6 +40,13 @@ function parseCSV(text) {
   return results;
 }
 
+// Helper to generate safe IDs from names if IDs are missing
+function generateSlug(prefix, name) {
+  if (!name) return `${prefix}-UNKNOWN`;
+  const clean = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return `${prefix}-${clean}`;
+}
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -56,22 +63,29 @@ export async function POST(request) {
       return NextResponse.json({ error: 'CSV file is empty or invalid' }, { status: 400 });
     }
     
-    // We will clear existing data and insert new data for the prototype
-    // (This is common for re-uploading spreadsheets, but we can also append.
-    // For a dashboard upload approach, clearing and reloading is the standard way to replace the report data)
+    // Clear sales transactions but KEEP master data to preserve admin target/price overrides
     await run('DELETE FROM sales');
     
     for (const row of rows) {
       // Find columns (case-insensitive checks)
       const tanggal = row.tanggal || row.date || '';
-      const customer = row.customer || row.pelanggan || '';
-      const produk = row.produk || row.product || row.barang || '';
-      const sales = row.sales || row.salesperson || row.karyawan || '';
+      
+      // Customer details
+      const customerName = row.customer || row.pelanggan || row.nama_customer || row.customer_name || '';
+      const customerId = row.customer_id || row.id_customer || row.pelanggan_id || generateSlug('CST', customerName);
+      
+      // Product details
+      const productName = row.produk || row.product || row.barang || row.nama_produk || row.product_name || '';
+      const productId = row.product_id || row.produk_id || row.id_produk || row.id_barang || row.barang_id || generateSlug('PRD', productName);
+      
+      // Sales details
+      const salesName = row.sales || row.salesperson || row.karyawan || row.nama_sales || row.sales_name || '';
+      const salesId = row.sales_id || row.id_sales || row.karyawan_id || row.salesperson_id || generateSlug('SLS', salesName);
       
       const qty = parseInt(row.qty || row.quantity || row.jumlah || '0', 10);
       const harga = parseFloat(row.harga || row.price || row.harga_satuan || '0');
       
-      // If omzet is directly provided, use it. Otherwise compute qty * harga
+      // Compute total omzet if not directly provided
       let omzet = parseFloat(row.omzet || row.revenue || row.total || '0');
       if (omzet === 0 && qty > 0 && harga > 0) {
         omzet = qty * harga;
@@ -79,11 +93,28 @@ export async function POST(request) {
       
       const target = parseFloat(row.target || row.target_penjualan || '0');
       
-      if (tanggal) {
+      if (tanggal && customerName && productName && salesName) {
+        // Auto-create Master Data (Insert or Ignore to avoid overwriting existing custom admin edits)
         await run(
-          `INSERT INTO sales (tanggal, customer, produk, sales, qty, harga, omzet, target)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [tanggal, customer, produk, sales, qty, harga, omzet, target]
+          `INSERT OR IGNORE INTO customers (id, name) VALUES (?, ?)`,
+          [customerId, customerName]
+        );
+        
+        await run(
+          `INSERT OR IGNORE INTO products (id, name, price) VALUES (?, ?, ?)`,
+          [productId, productName, harga]
+        );
+        
+        await run(
+          `INSERT OR IGNORE INTO salespeople (id, name, target) VALUES (?, ?, ?)`,
+          [salesId, salesName, target]
+        );
+        
+        // Insert transaction record referencing the Master Data IDs
+        await run(
+          `INSERT INTO sales (tanggal, customer_id, product_id, sales_id, qty, harga, omzet)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [tanggal, customerId, productId, salesId, qty, harga, omzet]
         );
       }
     }

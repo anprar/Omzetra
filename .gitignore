@@ -1,0 +1,25 @@
+# Dependency directories
+dashboard-app/node_modules/
+
+# Next.js build output
+dashboard-app/.next/
+dashboard-app/out/
+dashboard-app/build/
+
+# TypeScript build info
+dashboard-app/*.tsbuildinfo
+dashboard-app/next-env.d.ts
+
+# Debug and system files
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files
+.env*
+
+# Vercel
+.vercel

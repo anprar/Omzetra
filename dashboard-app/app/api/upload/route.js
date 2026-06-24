@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { run } from '@/lib/db';
+import * as XLSX from 'xlsx';
 
 function parseCSV(text) {
   const lines = text.split(/\r?\n/);
@@ -51,19 +52,57 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
+    const sheetUrl = formData.get('sheetUrl');
     
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+    let rows = [];
+    
+    if (sheetUrl) {
+      // Import from Google Sheets
+      const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) {
+        return NextResponse.json({ error: 'Format link Google Sheets tidak valid. Harus mengandung ID spreadsheet.' }, { status: 400 });
+      }
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+      const res = await fetch(csvUrl);
+      if (!res.ok) {
+        return NextResponse.json({ error: 'Gagal mengunduh Google Sheets. Pastikan link disetel ke "Siapa saja yang memiliki link dapat melihat" (Viewer/Publik).' }, { status: 400 });
+      }
+      const text = await res.text();
+      rows = parseCSV(text);
+    } else if (file) {
+      // Import from File (CSV or Excel)
+      const fileName = file.name.toLowerCase();
+      
+      if (fileName.endsWith('.csv')) {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        
+        // Normalize headers to lowercase
+        rows = rawRows.map(row => {
+          const normalized = {};
+          Object.keys(row).forEach(key => {
+            normalized[key.trim().toLowerCase()] = row[key].toString().trim();
+          });
+          return normalized;
+        });
+      } else {
+        return NextResponse.json({ error: 'Format file tidak didukung. Gunakan .csv, .xlsx, atau .xls' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'File atau link Google Sheets wajib disertakan' }, { status: 400 });
     }
-    
-    const text = await file.text();
-    const rows = parseCSV(text);
     
     if (rows.length === 0) {
-      return NextResponse.json({ error: 'CSV file is empty or invalid' }, { status: 400 });
+      return NextResponse.json({ error: 'Data kosong atau format tidak sesuai' }, { status: 400 });
     }
     
-    // Clear sales transactions but KEEP master data to preserve admin target/price overrides
+    // Clear sales transactions but KEEP master data to preserve custom target/price settings
     await run('DELETE FROM sales');
     
     for (const row of rows) {
@@ -94,7 +133,7 @@ export async function POST(request) {
       const target = parseFloat(row.target || row.target_penjualan || '0');
       
       if (tanggal && customerName && productName && salesName) {
-        // Auto-create Master Data (Insert or Ignore to avoid overwriting existing custom admin edits)
+        // Auto-create Master Data (Insert or Ignore to protect custom settings)
         await run(
           `INSERT OR IGNORE INTO customers (id, name) VALUES (?, ?)`,
           [customerId, customerName]

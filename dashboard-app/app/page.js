@@ -1,7 +1,22 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, RefreshCw, BarChart3, Users, Award, Sparkles, FileSpreadsheet, ShoppingBag, Settings, LogOut } from 'lucide-react';
+import { 
+  Upload, 
+  RefreshCw, 
+  BarChart3, 
+  Users, 
+  Award, 
+  Sparkles, 
+  FileSpreadsheet, 
+  ShoppingBag, 
+  Settings, 
+  LogOut,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown
+} from 'lucide-react';
 import UploadModal from '@/components/UploadModal';
 import AdminPanel from '@/components/AdminPanel';
 import { 
@@ -27,6 +42,14 @@ export default function Dashboard() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // Transaction Table States
+  const [transactions, setTransactions] = useState([]);
+  const [txSearch, setTxSearch] = useState('');
+  const [txSortBy, setTxSortBy] = useState('tanggal');
+  const [txOrder, setTxOrder] = useState('DESC');
+  const [txPage, setTxPage] = useState(1);
+  const [txPagination, setTxPagination] = useState({ totalCount: 0, totalPages: 1 });
+
   const fetchDashboardData = async () => {
     try {
       setRefreshing(true);
@@ -35,6 +58,8 @@ export default function Dashboard() {
         const result = await res.json();
         setData(result);
       }
+      // Also fetch transaction list
+      await fetchTransactions();
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -42,6 +67,28 @@ export default function Dashboard() {
       setRefreshing(false);
     }
   };
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await fetch(
+        `/api/transactions?search=${encodeURIComponent(txSearch)}&sortBy=${txSortBy}&order=${txOrder}&page=${txPage}&limit=10`
+      );
+      if (res.ok) {
+        const result = await res.json();
+        setTransactions(result.transactions || []);
+        setTxPagination(result.pagination || { totalCount: 0, totalPages: 1 });
+      }
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+    }
+  };
+
+  // Trigger search/sort fetch
+  useEffect(() => {
+    if (currentUser) {
+      fetchTransactions();
+    }
+  }, [txSearch, txSortBy, txOrder, txPage]);
 
   useEffect(() => {
     const session = sessionStorage.getItem('omzetra_session');
@@ -92,6 +139,34 @@ export default function Dashboard() {
     sessionStorage.removeItem('omzetra_session');
     setCurrentUser(null);
     setData(null);
+    setTransactions([]);
+  };
+
+  const handleSort = (field) => {
+    if (txSortBy === field) {
+      setTxOrder(txOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setTxSortBy(field);
+      setTxOrder('DESC');
+    }
+    setTxPage(1);
+  };
+
+  const renderSortableHeader = (field, label) => {
+    const isActive = txSortBy === field;
+    return (
+      <th 
+        onClick={() => handleSort(field)}
+        style={{ cursor: 'pointer', userSelect: 'none', transition: 'color 0.2s' }}
+        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+        onMouseLeave={(e) => e.currentTarget.style.color = ''}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          {label}
+          <ArrowUpDown size={12} style={{ color: isActive ? 'var(--color-primary)' : 'var(--text-muted)', opacity: isActive ? 1 : 0.4 }} />
+        </div>
+      </th>
+    );
   };
 
   // Render Login Page if user is not authenticated
@@ -248,7 +323,7 @@ export default function Dashboard() {
               Belum Ada Data Penjualan
             </h2>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '450px', margin: '0 auto', fontSize: '0.95rem', lineHeight: '1.5' }}>
-              Dashboard masih kosong. Unggah laporan penjualan harian dalam format CSV atau Excel untuk memulai visualisasi metrik bisnis Anda secara instan.
+              Dashboard masih kosong. Unggah laporan penjualan bulanan (format CSV, Excel, atau Tautan Google Sheets) untuk memulai visualisasi instan.
             </p>
           </div>
           <button className="btn btn-primary" onClick={() => setIsUploadOpen(true)} style={{ padding: '0.85rem 2rem', fontSize: '1rem' }}>
@@ -308,6 +383,93 @@ export default function Dashboard() {
           </div>
 
           <SalesPerformanceTable data={data.salesPerformance} />
+
+          {/* Widget: Transaction History Table */}
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 className="widget-title" style={{ marginBottom: 0 }}>
+                <FileSpreadsheet size={18} style={{ color: 'var(--color-primary)' }} />
+                Histori Transaksi Penjualan (Isi CSV/Excel)
+              </h3>
+              
+              {/* Search Bar */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Cari pelanggan, produk, sales..." 
+                  value={txSearch}
+                  onChange={(e) => { setTxSearch(e.target.value); setTxPage(1); }}
+                  style={{ padding: '0.5rem 1rem 0.5rem 2.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: '#fff', outline: 'none', fontSize: '0.85rem', width: '260px' }}
+                />
+              </div>
+            </div>
+
+            {transactions.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '3rem 0' }}>
+                Tidak ada transaksi ditemukan.
+              </p>
+            ) : (
+              <>
+                <div className="custom-table-container">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        {renderSortableHeader('tanggal', 'Tanggal')}
+                        {renderSortableHeader('customer', 'Pelanggan')}
+                        {renderSortableHeader('produk', 'Produk')}
+                        {renderSortableHeader('sales', 'Sales')}
+                        {renderSortableHeader('qty', 'Qty')}
+                        {renderSortableHeader('harga', 'Harga')}
+                        {renderSortableHeader('omzet', 'Omzet')}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx) => (
+                        <tr key={tx.id}>
+                          <td>{tx.tanggal}</td>
+                          <td style={{ fontWeight: 600 }}>{tx.customer}</td>
+                          <td>{tx.produk}</td>
+                          <td>{tx.sales}</td>
+                          <td>{tx.qty}</td>
+                          <td>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(tx.harga)}</td>
+                          <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(tx.omzet)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <div>
+                    Menampilkan <b>{transactions.length}</b> dari <b>{txPagination.totalCount}</b> transaksi
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button 
+                      className="btn btn-secondary" 
+                      disabled={txPage === 1}
+                      onClick={() => setTxPage(p => Math.max(p - 1, 1))}
+                      style={{ padding: '0.35rem 0.75rem', height: 'auto', display: 'flex', alignItems: 'center' }}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span>Halaman <b>{txPage}</b> dari <b>{txPagination.totalPages || 1}</b></span>
+                    <button 
+                      className="btn btn-secondary" 
+                      disabled={txPage >= txPagination.totalPages}
+                      onClick={() => setTxPage(p => Math.min(p + 1, txPagination.totalPages))}
+                      style={{ padding: '0.35rem 0.75rem', height: 'auto', display: 'flex', alignItems: 'center' }}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

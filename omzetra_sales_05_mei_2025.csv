@@ -1,0 +1,6 @@
+Tanggal,Customer_ID,Customer,Product_ID,Produk,Sales_ID,Sales,Qty,Harga,Target
+2025-05-04,CUST-001,Budi Utomo,PROD-004,Monitor Dell UltraSharp,SLS-001,Andi,2,5500000,22000000
+2025-05-10,CUST-003,CV Maju Bersama,PROD-001,Laptop ASUS ROG,SLS-003,Citra,4,18500000,60000000
+2025-05-14,CUST-002,Siti Aminah,PROD-002,Mouse Logitech G502,SLS-002,Budi,5,1200000,10000000
+2025-05-20,CUST-004,PT Makmur Sejahtera,PROD-003,Keyboard Keychron K2,SLS-001,Andi,3,1500000,22000000
+2025-05-25,CUST-003,CV Maju Bersama,PROD-004,Monitor Dell UltraSharp,SLS-003,Citra,1,5500000,60000000

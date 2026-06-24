@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [filterSalesId, setFilterSalesId] = useState('');
   const [filterCustomerId, setFilterCustomerId] = useState('');
   const [filterProductId, setFilterProductId] = useState('');
+  const [dbDateRange, setDbDateRange] = useState({ minDate: '', maxDate: '' });
 
   // Interactive System Workflow Tab State
   const [activeWorkflowTab, setActiveWorkflowTab] = useState('flow'); // 'flow' | 'risks' | 'arch'
@@ -72,30 +73,33 @@ export default function Dashboard() {
 
   // Update dates based on period selection
   useEffect(() => {
+    // Determine the anchor date (default to today, or use the maxDate from the database if available)
+    let anchor = new Date();
+    if (dbDateRange && dbDateRange.maxDate) {
+      anchor = new Date(dbDateRange.maxDate);
+    }
+
     if (periodType === 'all') {
       setStartDate('');
       setEndDate('');
     } else if (periodType === 'this-month') {
-      const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const firstDay = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+      const lastDay = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
       setStartDate(firstDay.toISOString().split('T')[0]);
       setEndDate(lastDay.toISOString().split('T')[0]);
     } else if (periodType === '30-days') {
-      const now = new Date();
-      const past = new Date();
-      past.setDate(now.getDate() - 30);
+      const past = new Date(anchor);
+      past.setDate(anchor.getDate() - 30);
       setStartDate(past.toISOString().split('T')[0]);
-      setEndDate(now.toISOString().split('T')[0]);
+      setEndDate(anchor.toISOString().split('T')[0]);
     } else if (periodType === 'this-quarter') {
-      const now = new Date();
-      const quarter = Math.floor(now.getMonth() / 3);
-      const firstDay = new Date(now.getFullYear(), quarter * 3, 1);
-      const lastDay = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+      const quarter = Math.floor(anchor.getMonth() / 3);
+      const firstDay = new Date(anchor.getFullYear(), quarter * 3, 1);
+      const lastDay = new Date(anchor.getFullYear(), (quarter + 1) * 3, 0);
       setStartDate(firstDay.toISOString().split('T')[0]);
       setEndDate(lastDay.toISOString().split('T')[0]);
     }
-  }, [periodType]);
+  }, [periodType, dbDateRange]);
 
   const fetchDashboardData = async () => {
     try {
@@ -114,6 +118,9 @@ export default function Dashboard() {
       if (res.ok) {
         const result = await res.json();
         setData(result);
+        if (result.dateRange && result.dateRange.maxDate) {
+          setDbDateRange(result.dateRange);
+        }
       }
       // Also fetch transaction list
       await fetchTransactions();

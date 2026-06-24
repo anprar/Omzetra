@@ -406,6 +406,12 @@ export async function GET(request) {
       }
     }
 
+    // 11. Fetch absolute date bounds of the entire dataset to anchor frontend filters
+    const datesSql = `SELECT MIN(tanggal) as min_date, MAX(tanggal) as max_date FROM sales`;
+    const datesResult = await query(datesSql);
+    const minDate = datesResult[0]?.min_date || '';
+    const maxDate = datesResult[0]?.max_date || '';
+
     return NextResponse.json({
       metrics: {
         totalOmzet,
@@ -422,7 +428,11 @@ export async function GET(request) {
       salesPerformance,
       salesTrend,
       insights,
-      lastUploadValidation
+      lastUploadValidation,
+      dateRange: {
+        minDate,
+        maxDate
+      }
     });
   } catch (error) {
     console.error('Error generating dashboard data:', error);

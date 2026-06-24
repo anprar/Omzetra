@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, RefreshCw, BarChart3, Users, Award, Sparkles, FileSpreadsheet, ShoppingBag } from 'lucide-react';
+import { Upload, RefreshCw, BarChart3, Users, Award, Sparkles, FileSpreadsheet, ShoppingBag, Settings, LogOut } from 'lucide-react';
 import UploadModal from '@/components/UploadModal';
+import AdminPanel from '@/components/AdminPanel';
 import { 
   KPIGrid, 
   TrendChart, 
@@ -13,9 +14,18 @@ import {
 
 export default function Dashboard() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Login Form States
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -34,12 +44,116 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    const session = sessionStorage.getItem('omzetra_session');
+    if (session) {
+      setCurrentUser(JSON.parse(session));
+      fetchDashboardData();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const handleUploadSuccess = () => {
-    fetchDashboardData();
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginUsername || !loginPassword) {
+      setLoginError('Username dan Password wajib diisi');
+      return;
+    }
+    
+    setLoginLoading(true);
+    setLoginError('');
+    
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok && result.success) {
+        setCurrentUser(result.user);
+        sessionStorage.setItem('omzetra_session', JSON.stringify(result.user));
+        setLoading(true);
+        // Fetch dashboard data immediately after login
+        await fetchDashboardData();
+      } else {
+        setLoginError(result.error || 'Username atau Password salah');
+      }
+    } catch (err) {
+      setLoginError('Terjadi kesalahan koneksi internet');
+    } finally {
+      setLoginLoading(false);
+    }
   };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('omzetra_session');
+    setCurrentUser(null);
+    setData(null);
+  };
+
+  // Render Login Page if user is not authenticated
+  if (!currentUser && !loading) {
+    return (
+      <main className="dashboard-container" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '1rem' }}>
+        <div className="ambient-glow-1"></div>
+        <div className="ambient-glow-2"></div>
+        
+        <div className="glass-card" style={{ width: '400px', maxWidth: '100%', padding: '2.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-lg), var(--shadow-neon)', textAlign: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+            <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 10px rgba(139, 92, 246, 0.6))', marginBottom: '0.5rem' }}>
+              <defs>
+                <linearGradient id="logoGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--color-primary)" />
+                  <stop offset="100%" stopColor="var(--color-secondary)" />
+                </linearGradient>
+              </defs>
+              <circle cx="16" cy="16" r="11" stroke="url(#logoGrad2)" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 16" />
+              <path d="M11 20L15 16L18 19L22 13" stroke="url(#logoGrad2)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M18 13H22V17" stroke="url(#logoGrad2)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 700 }}>Omzetra Sign In</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Masukkan akun untuk mengakses sales dashboard</p>
+          </div>
+
+          {loginError && (
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: '0.85rem', textAlign: 'left' }}>
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Username</label>
+              <input 
+                type="text" 
+                placeholder="Masukkan username" 
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Password</label>
+              <input 
+                type="password" 
+                placeholder="Masukkan password" 
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.9rem' }}
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem', marginTop: '0.5rem' }} disabled={loginLoading}>
+              {loginLoading ? 'Memproses...' : 'Sign In'}
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   const hasData = data && data.metrics && data.metrics.totalOmzet > 0;
 
@@ -64,6 +178,16 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {currentUser?.role === 'admin' && (
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setIsAdminOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', padding: 0 }}
+              title="Admin Control Panel"
+            >
+              <Settings size={18} />
+            </button>
+          )}
           {hasData && (
             <button 
               className="btn btn-secondary" 
@@ -78,6 +202,14 @@ export default function Dashboard() {
           <button className="btn btn-primary" onClick={() => setIsUploadOpen(true)}>
             <Upload size={16} />
             Unggah Excel/CSV
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleLogout}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', padding: 0 }}
+            title="Keluar / Logout"
+          >
+            <LogOut size={18} />
           </button>
         </div>
       </header>
@@ -182,7 +314,13 @@ export default function Dashboard() {
       <UploadModal 
         isOpen={isUploadOpen} 
         onClose={() => setIsUploadOpen(false)} 
-        onUploadSuccess={handleUploadSuccess} 
+        onUploadSuccess={fetchDashboardData} 
+      />
+
+      <AdminPanel 
+        isOpen={isAdminOpen} 
+        onClose={() => setIsAdminOpen(false)} 
+        onResetSuccess={fetchDashboardData} 
       />
 
       <footer style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>

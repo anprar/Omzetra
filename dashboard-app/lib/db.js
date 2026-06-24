@@ -24,6 +24,21 @@ const db = new sqlite.Database(dbPath, (err) => {
         target REAL
       )
     `);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        role TEXT
+      )
+    `, () => {
+      db.run(`
+        INSERT OR IGNORE INTO users (username, password, role)
+        VALUES 
+          ('admin', 'adminomzetra', 'admin'),
+          ('user', '12345', 'user')
+      `);
+    });
   }
 });
 

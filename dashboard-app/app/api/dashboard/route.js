@@ -42,9 +42,12 @@ export async function GET() {
        ORDER BY total_omzet DESC`
     );
 
-    // 5. Monthly Sales Trend (for chart)
+    // 5. Monthly/Daily Sales Trend (for chart)
     const salesTrend = await query(
-      `SELECT s.tanggal, SUM(s.omzet) as total_omzet 
+      `SELECT s.tanggal, 
+              SUM(s.omzet) as total_omzet,
+              SUM(s.qty) as total_qty,
+              COUNT(s.id) as total_transactions
        FROM sales s
        GROUP BY s.tanggal 
        ORDER BY s.tanggal ASC`

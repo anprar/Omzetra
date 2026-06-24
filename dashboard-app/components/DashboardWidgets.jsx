@@ -82,6 +82,9 @@ export function KPIGrid({ metrics }) {
 }
 
 export function TrendChart({ trendData }) {
+  const [metric, setMetric] = React.useState('omzet'); // 'omzet' | 'qty' | 'transactions'
+  const [chartType, setChartType] = React.useState('line'); // 'line' | 'bar'
+
   if (!trendData || trendData.length === 0) {
     return (
       <div style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -92,81 +95,242 @@ export function TrendChart({ trendData }) {
 
   const chartHeight = 150;
   const chartWidth = 500;
-  const paddingX = 40;
+  const paddingX = 45;
   const paddingY = 20;
 
-  const maxVal = Math.max(...trendData.map(d => Math.max(d.total_omzet, d.total_target || 0))) || 1;
+  const getVal = (d) => {
+    if (metric === 'qty') return d.total_qty || 0;
+    if (metric === 'transactions') return d.total_transactions || 0;
+    return d.total_omzet || 0;
+  };
 
-  // Generate coordinates for Omzet line
-  const omzetPoints = trendData.map((d, index) => {
+  const formatVal = (val) => {
+    if (metric === 'omzet') return formatRupiah(val);
+    if (metric === 'qty') return `${val.toLocaleString('id-ID')} Pcs`;
+    return `${val.toLocaleString('id-ID')} Transaksi`;
+  };
+
+  const formatYAxis = (val) => {
+    if (metric === 'omzet') {
+      if (val >= 1000000000) return `${(val / 1000000000).toFixed(1)} M`; // Milyar
+      if (val >= 1000000) return `${(val / 1000000).toFixed(1)} Jt`; // Juta
+      if (val >= 1000) return `${(val / 1000).toFixed(0)} K`;
+      return val.toString();
+    }
+    return Math.round(val).toLocaleString('id-ID');
+  };
+
+  const maxVal = Math.max(...trendData.map(d => getVal(d))) || 1;
+
+  // Generate coordinates for points
+  const points = trendData.map((d, index) => {
     const x = paddingX + (index * (chartWidth - paddingX * 2) / (trendData.length - 1 || 1));
-    const y = chartHeight - paddingY - (d.total_omzet * (chartHeight - paddingY * 2) / maxVal);
-    return { x, y };
+    const y = chartHeight - paddingY - (getVal(d) * (chartHeight - paddingY * 2) / maxVal);
+    return { x, y, val: getVal(d), date: d.tanggal };
   });
 
-  const omzetPath = omzetPoints.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
-  const omzetArea = omzetPoints.length > 0 
-    ? `${omzetPath} L ${omzetPoints[omzetPoints.length - 1].x} ${chartHeight - paddingY} L ${omzetPoints[0].x} ${chartHeight - paddingY} Z`
+  const linePath = points.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
+  const areaPath = points.length > 0 
+    ? `${linePath} L ${points[points.length - 1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`
     : '';
 
+  const barWidth = Math.max(3, ((chartWidth - paddingX * 2) / trendData.length) * 0.6);
+
   return (
-    <div style={{ width: '100%', marginTop: '1rem' }}>
-      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', overflow: 'visible' }}>
-        <defs>
-          <linearGradient id="omzetGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25"/>
-            <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0"/>
-          </linearGradient>
-        </defs>
-        
-        {/* Horizontal grid lines */}
-        <line x1={paddingX} y1={paddingY} x2={chartWidth - paddingX} y2={paddingY} stroke="rgba(255,255,255,0.03)" />
-        <line x1={paddingX} y1={(chartHeight - paddingY * 2) / 2 + paddingY} x2={chartWidth - paddingX} y2={(chartHeight - paddingY * 2) / 2 + paddingY} stroke="rgba(255,255,255,0.03)" />
-        <line x1={paddingX} y1={chartHeight - paddingY} x2={chartWidth - paddingX} y2={chartHeight - paddingY} stroke="rgba(255,255,255,0.08)" />
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+      {/* Controls Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        {/* Metric Selector */}
+        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+          <button 
+            type="button"
+            onClick={() => setMetric('omzet')}
+            style={{ 
+              padding: '0.35rem 0.75rem', 
+              fontSize: '0.75rem', 
+              background: metric === 'omzet' ? 'var(--color-primary)' : 'transparent', 
+              border: 'none', 
+              color: metric === 'omzet' ? '#fff' : 'var(--text-secondary)', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              transition: 'all 0.2s'
+            }}
+          >
+            Omzet (Rp)
+          </button>
+          <button 
+            type="button"
+            onClick={() => setMetric('qty')}
+            style={{ 
+              padding: '0.35rem 0.75rem', 
+              fontSize: '0.75rem', 
+              background: metric === 'qty' ? 'var(--color-primary)' : 'transparent', 
+              border: 'none', 
+              color: metric === 'qty' ? '#fff' : 'var(--text-secondary)', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              transition: 'all 0.2s'
+            }}
+          >
+            Kuantitas (Qty)
+          </button>
+          <button 
+            type="button"
+            onClick={() => setMetric('transactions')}
+            style={{ 
+              padding: '0.35rem 0.75rem', 
+              fontSize: '0.75rem', 
+              background: metric === 'transactions' ? 'var(--color-primary)' : 'transparent', 
+              border: 'none', 
+              color: metric === 'transactions' ? '#fff' : 'var(--text-secondary)', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              transition: 'all 0.2s'
+            }}
+          >
+            Transaksi
+          </button>
+        </div>
 
-        {/* Area fill */}
-        {omzetArea && <path d={omzetArea} fill="url(#omzetGrad)" />}
+        {/* Chart Type Selector */}
+        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+          <button 
+            type="button"
+            onClick={() => setChartType('line')}
+            style={{ 
+              padding: '0.35rem 0.75rem', 
+              fontSize: '0.75rem', 
+              background: chartType === 'line' ? 'var(--color-secondary)' : 'transparent', 
+              border: 'none', 
+              color: chartType === 'line' ? '#fff' : 'var(--text-secondary)', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              transition: 'all 0.2s'
+            }}
+          >
+            Garis
+          </button>
+          <button 
+            type="button"
+            onClick={() => setChartType('bar')}
+            style={{ 
+              padding: '0.35rem 0.75rem', 
+              fontSize: '0.75rem', 
+              background: chartType === 'bar' ? 'var(--color-secondary)' : 'transparent', 
+              border: 'none', 
+              color: chartType === 'bar' ? '#fff' : 'var(--text-secondary)', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              transition: 'all 0.2s'
+            }}
+          >
+            Batang
+          </button>
+        </div>
+      </div>
 
-        {/* Trend line */}
-        {omzetPath && (
-          <path 
-            d={omzetPath} 
-            fill="none" 
-            stroke="var(--color-primary)" 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
-        )}
+      {/* SVG chart rendering */}
+      <div style={{ width: '100%' }}>
+        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="omzetGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.01"/>
+            </linearGradient>
+          </defs>
+          
+          {/* Horizontal grid lines */}
+          <line x1={paddingX} y1={paddingY} x2={chartWidth - paddingX} y2={paddingY} stroke="rgba(255,255,255,0.03)" />
+          <line x1={paddingX} y1={(chartHeight - paddingY * 2) / 2 + paddingY} x2={chartWidth - paddingX} y2={(chartHeight - paddingY * 2) / 2 + paddingY} stroke="rgba(255,255,255,0.03)" />
+          <line x1={paddingX} y1={chartHeight - paddingY} x2={chartWidth - paddingX} y2={chartHeight - paddingY} stroke="rgba(255,255,255,0.08)" />
 
-        {/* Data points */}
-        {omzetPoints.map((p, i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r="4" fill="#030712" stroke="var(--color-primary)" strokeWidth="2" />
-            {/* Tooltip hover effect (simplified) */}
-            <title>{`${trendData[i].tanggal}: ${formatRupiah(trendData[i].total_omzet)}`}</title>
-          </g>
-        ))}
+          {/* Y-Axis Labels */}
+          <text x={paddingX - 8} y={paddingY + 2.5} textAnchor="end" fill="var(--text-muted)" fontSize="7" fontFamily="var(--font-body)">
+            {formatYAxis(maxVal)}
+          </text>
+          <text x={paddingX - 8} y={(chartHeight - paddingY * 2) / 2 + paddingY + 2.5} textAnchor="end" fill="var(--text-muted)" fontSize="7" fontFamily="var(--font-body)">
+            {formatYAxis(maxVal / 2)}
+          </text>
+          <text x={paddingX - 8} y={chartHeight - paddingY + 2.5} textAnchor="end" fill="var(--text-muted)" fontSize="7" fontFamily="var(--font-body)">
+            0
+          </text>
 
-        {/* X-Axis labels */}
-        {trendData.map((d, i) => {
-          if (trendData.length > 7 && i % Math.ceil(trendData.length / 5) !== 0) return null;
-          const x = paddingX + (i * (chartWidth - paddingX * 2) / (trendData.length - 1 || 1));
-          return (
-            <text 
-              key={i} 
-              x={x} 
-              y={chartHeight - 4} 
-              textAnchor="middle" 
-              fill="var(--text-muted)" 
-              fontSize="8"
-              fontFamily="var(--font-body)"
-            >
-              {d.tanggal}
-            </text>
-          );
-        })}
-      </svg>
+          {/* Render based on Chart Type */}
+          {chartType === 'line' ? (
+            <>
+              {/* Area fill */}
+              {areaPath && <path d={areaPath} fill="url(#omzetGrad)" />}
+
+              {/* Trend line */}
+              {linePath && (
+                <path 
+                  d={linePath} 
+                  fill="none" 
+                  stroke="var(--color-primary)" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                />
+              )}
+
+              {/* Data points */}
+              {points.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r="3.5" fill="#030712" stroke="var(--color-primary)" strokeWidth="2" />
+                  <title>{`${p.date}: ${formatVal(p.val)}`}</title>
+                </g>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* Bar Chart rendering */}
+              {points.map((p, i) => {
+                const barHeight = chartHeight - paddingY - p.y;
+                return (
+                  <g key={i}>
+                    <rect 
+                      x={p.x - barWidth / 2} 
+                      y={p.y} 
+                      width={barWidth} 
+                      height={Math.max(1, barHeight)} 
+                      fill="url(#omzetGrad)"
+                      stroke="var(--color-primary)"
+                      strokeWidth="1.2"
+                      rx="1"
+                      style={{ transition: 'all 0.3s' }}
+                    />
+                    <title>{`${p.date}: ${formatVal(p.val)}`}</title>
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* X-Axis labels */}
+          {trendData.map((d, i) => {
+            if (trendData.length > 7 && i % Math.ceil(trendData.length / 5) !== 0) return null;
+            const x = paddingX + (i * (chartWidth - paddingX * 2) / (trendData.length - 1 || 1));
+            return (
+              <text 
+                key={i} 
+                x={x} 
+                y={chartHeight - 4} 
+                textAnchor="middle" 
+                fill="var(--text-muted)" 
+                fontSize="7.5"
+                fontFamily="var(--font-body)"
+              >
+                {d.tanggal}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }

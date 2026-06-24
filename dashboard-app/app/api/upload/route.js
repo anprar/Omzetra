@@ -102,9 +102,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Data kosong atau format tidak sesuai' }, { status: 400 });
     }
     
-    // Clear sales transactions but KEEP master data to preserve custom target/price settings
-    await run('DELETE FROM sales');
-    
+    // We do NOT delete existing sales here to allow accumulating monthly reports.
+    // The admin has a dedicated "Reset Data Penjualan" button in the Admin Panel if they want a clean database.
+    const { query } = require('@/lib/db');
+
     for (const row of rows) {
       // Find columns (case-insensitive checks)
       const tanggal = row.tanggal || row.date || '';
@@ -149,12 +150,21 @@ export async function POST(request) {
           [salesId, salesName, target]
         );
         
-        // Insert transaction record referencing the Master Data IDs
-        await run(
-          `INSERT INTO sales (tanggal, customer_id, product_id, sales_id, qty, harga, omzet)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [tanggal, customerId, productId, salesId, qty, harga, omzet]
+        // Prevent duplicate transaction entries: check if exactly the same record already exists
+        const existingTx = await query(
+          `SELECT id FROM sales 
+           WHERE tanggal = ? AND customer_id = ? AND product_id = ? AND sales_id = ? AND qty = ? AND harga = ?`,
+          [tanggal, customerId, productId, salesId, qty, harga]
         );
+        
+        if (existingTx.length === 0) {
+          // Insert transaction record referencing the Master Data IDs
+          await run(
+            `INSERT INTO sales (tanggal, customer_id, product_id, sales_id, qty, harga, omzet)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [tanggal, customerId, productId, salesId, qty, harga, omzet]
+          );
+        }
       }
     }
     

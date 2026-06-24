@@ -81,11 +81,29 @@ export function KPIGrid({ metrics }) {
   );
 }
 
-export function TrendChart({ trendData }) {
+export function TrendChart({ trendData, productsData = [], salesData = [], customersData = [] }) {
+  const [dimension, setDimension] = React.useState('tanggal'); // 'tanggal' | 'produk' | 'sales' | 'customer'
   const [metric, setMetric] = React.useState('omzet'); // 'omzet' | 'qty' | 'transactions'
   const [chartType, setChartType] = React.useState('line'); // 'line' | 'bar'
 
-  if (!trendData || trendData.length === 0) {
+  // Get active dataset and labels based on selected dimension
+  const getActiveData = () => {
+    switch (dimension) {
+      case 'produk':
+        return productsData;
+      case 'sales':
+        return salesData;
+      case 'customer':
+        return customersData;
+      case 'tanggal':
+      default:
+        return trendData;
+    }
+  };
+
+  const activeData = getActiveData();
+
+  if (!activeData || activeData.length === 0) {
     return (
       <div style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
         Belum ada data untuk menampilkan grafik trend.
@@ -95,13 +113,20 @@ export function TrendChart({ trendData }) {
 
   const chartHeight = 150;
   const chartWidth = 500;
-  const paddingX = 45;
+  const paddingX = 50;
   const paddingY = 20;
 
   const getVal = (d) => {
     if (metric === 'qty') return d.total_qty || 0;
     if (metric === 'transactions') return d.total_transactions || 0;
     return d.total_omzet || 0;
+  };
+
+  const getLabel = (d) => {
+    if (dimension === 'produk') return d.produk || '';
+    if (dimension === 'sales') return d.sales || '';
+    if (dimension === 'customer') return d.customer || '';
+    return d.tanggal || '';
   };
 
   const formatVal = (val) => {
@@ -120,13 +145,13 @@ export function TrendChart({ trendData }) {
     return Math.round(val).toLocaleString('id-ID');
   };
 
-  const maxVal = Math.max(...trendData.map(d => getVal(d))) || 1;
+  const maxVal = Math.max(...activeData.map(d => getVal(d))) || 1;
 
   // Generate coordinates for points
-  const points = trendData.map((d, index) => {
-    const x = paddingX + (index * (chartWidth - paddingX * 2) / (trendData.length - 1 || 1));
+  const points = activeData.map((d, index) => {
+    const x = paddingX + (index * (chartWidth - paddingX * 2) / (activeData.length - 1 || 1));
     const y = chartHeight - paddingY - (getVal(d) * (chartHeight - paddingY * 2) / maxVal);
-    return { x, y, val: getVal(d), date: d.tanggal };
+    return { x, y, val: getVal(d), label: getLabel(d) };
   });
 
   const linePath = points.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
@@ -134,103 +159,157 @@ export function TrendChart({ trendData }) {
     ? `${linePath} L ${points[points.length - 1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`
     : '';
 
-  const barWidth = Math.max(3, ((chartWidth - paddingX * 2) / trendData.length) * 0.6);
+  const barWidth = Math.max(3, ((chartWidth - paddingX * 2) / activeData.length) * 0.6);
+
+  // Auto-switch to Bar Chart if dimension is categorical for better readability
+  React.useEffect(() => {
+    if (dimension !== 'tanggal') {
+      setChartType('bar');
+    } else {
+      setChartType('line');
+    }
+  }, [dimension]);
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-      {/* Controls Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        {/* Metric Selector */}
-        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
-          <button 
-            type="button"
-            onClick={() => setMetric('omzet')}
-            style={{ 
-              padding: '0.35rem 0.75rem', 
-              fontSize: '0.75rem', 
-              background: metric === 'omzet' ? 'var(--color-primary)' : 'transparent', 
-              border: 'none', 
-              color: metric === 'omzet' ? '#fff' : 'var(--text-secondary)', 
-              borderRadius: 'var(--radius-sm)', 
-              cursor: 'pointer', 
-              fontWeight: 600,
-              transition: 'all 0.2s'
-            }}
-          >
-            Omzet (Rp)
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMetric('qty')}
-            style={{ 
-              padding: '0.35rem 0.75rem', 
-              fontSize: '0.75rem', 
-              background: metric === 'qty' ? 'var(--color-primary)' : 'transparent', 
-              border: 'none', 
-              color: metric === 'qty' ? '#fff' : 'var(--text-secondary)', 
-              borderRadius: 'var(--radius-sm)', 
-              cursor: 'pointer', 
-              fontWeight: 600,
-              transition: 'all 0.2s'
-            }}
-          >
-            Kuantitas (Qty)
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMetric('transactions')}
-            style={{ 
-              padding: '0.35rem 0.75rem', 
-              fontSize: '0.75rem', 
-              background: metric === 'transactions' ? 'var(--color-primary)' : 'transparent', 
-              border: 'none', 
-              color: metric === 'transactions' ? '#fff' : 'var(--text-secondary)', 
-              borderRadius: 'var(--radius-sm)', 
-              cursor: 'pointer', 
-              fontWeight: 600,
-              transition: 'all 0.2s'
-            }}
-          >
-            Transaksi
-          </button>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.5rem' }}>
+      
+      {/* Controls Container */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
+        
+        {/* Row 1: Dimension Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Analisis Berdasarkan:</span>
+          <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+            {[
+              { id: 'tanggal', label: 'Waktu (Harian)' },
+              { id: 'produk', label: 'Produk (Item)' },
+              { id: 'sales', label: 'Salesperson' },
+              { id: 'customer', label: 'Pelanggan' }
+            ].map(dim => (
+              <button 
+                key={dim.id}
+                type="button"
+                onClick={() => setDimension(dim.id)}
+                style={{ 
+                  padding: '0.35rem 0.65rem', 
+                  fontSize: '0.7rem', 
+                  background: dimension === dim.id ? 'var(--color-primary)' : 'transparent', 
+                  border: 'none', 
+                  color: dimension === dim.id ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                {dim.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Chart Type Selector */}
-        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
-          <button 
-            type="button"
-            onClick={() => setChartType('line')}
-            style={{ 
-              padding: '0.35rem 0.75rem', 
-              fontSize: '0.75rem', 
-              background: chartType === 'line' ? 'var(--color-secondary)' : 'transparent', 
-              border: 'none', 
-              color: chartType === 'line' ? '#fff' : 'var(--text-secondary)', 
-              borderRadius: 'var(--radius-sm)', 
-              cursor: 'pointer', 
-              fontWeight: 600,
-              transition: 'all 0.2s'
-            }}
-          >
-            Garis
-          </button>
-          <button 
-            type="button"
-            onClick={() => setChartType('bar')}
-            style={{ 
-              padding: '0.35rem 0.75rem', 
-              fontSize: '0.75rem', 
-              background: chartType === 'bar' ? 'var(--color-secondary)' : 'transparent', 
-              border: 'none', 
-              color: chartType === 'bar' ? '#fff' : 'var(--text-secondary)', 
-              borderRadius: 'var(--radius-sm)', 
-              cursor: 'pointer', 
-              fontWeight: 600,
-              transition: 'all 0.2s'
-            }}
-          >
-            Batang
-          </button>
+        {/* Row 2: Metric & Chart Type Selector */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          
+          {/* Metric Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>Metrik:</span>
+            <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+              <button 
+                type="button"
+                onClick={() => setMetric('omzet')}
+                style={{ 
+                  padding: '0.3rem 0.6rem', 
+                  fontSize: '0.7rem', 
+                  background: metric === 'omzet' ? 'var(--color-primary)' : 'transparent', 
+                  border: 'none', 
+                  color: metric === 'omzet' ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                Omzet (Rp)
+              </button>
+              <button 
+                type="button"
+                onClick={() => setMetric('qty')}
+                style={{ 
+                  padding: '0.3rem 0.6rem', 
+                  fontSize: '0.7rem', 
+                  background: metric === 'qty' ? 'var(--color-primary)' : 'transparent', 
+                  border: 'none', 
+                  color: metric === 'qty' ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                Kuantitas (Qty)
+              </button>
+              <button 
+                type="button"
+                onClick={() => setMetric('transactions')}
+                style={{ 
+                  padding: '0.3rem 0.6rem', 
+                  fontSize: '0.7rem', 
+                  background: metric === 'transactions' ? 'var(--color-primary)' : 'transparent', 
+                  border: 'none', 
+                  color: metric === 'transactions' ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                Transaksi
+              </button>
+            </div>
+          </div>
+
+          {/* Chart Type Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>Tipe:</span>
+            <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+              <button 
+                type="button"
+                onClick={() => setChartType('line')}
+                style={{ 
+                  padding: '0.3rem 0.6rem', 
+                  fontSize: '0.7rem', 
+                  background: chartType === 'line' ? 'var(--color-secondary)' : 'transparent', 
+                  border: 'none', 
+                  color: chartType === 'line' ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                Garis
+              </button>
+              <button 
+                type="button"
+                onClick={() => setChartType('bar')}
+                style={{ 
+                  padding: '0.3rem 0.6rem', 
+                  fontSize: '0.7rem', 
+                  background: chartType === 'bar' ? 'var(--color-secondary)' : 'transparent', 
+                  border: 'none', 
+                  color: chartType === 'bar' ? '#fff' : 'var(--text-secondary)', 
+                  borderRadius: 'var(--radius-sm)', 
+                  cursor: 'pointer', 
+                  fontWeight: 600,
+                  transition: 'all 0.15s'
+                }}
+              >
+                Batang
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -282,7 +361,7 @@ export function TrendChart({ trendData }) {
               {points.map((p, i) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r="3.5" fill="#030712" stroke="var(--color-primary)" strokeWidth="2" />
-                  <title>{`${p.date}: ${formatVal(p.val)}`}</title>
+                  <title>{`${p.label}: ${formatVal(p.val)}`}</title>
                 </g>
               ))}
             </>
@@ -301,10 +380,10 @@ export function TrendChart({ trendData }) {
                       fill="url(#omzetGrad)"
                       stroke="var(--color-primary)"
                       strokeWidth="1.2"
-                      rx="1"
+                      rx="1.5"
                       style={{ transition: 'all 0.3s' }}
                     />
-                    <title>{`${p.date}: ${formatVal(p.val)}`}</title>
+                    <title>{`${p.label}: ${formatVal(p.val)}`}</title>
                   </g>
                 );
               })}
@@ -312,9 +391,9 @@ export function TrendChart({ trendData }) {
           )}
 
           {/* X-Axis labels */}
-          {trendData.map((d, i) => {
-            if (trendData.length > 7 && i % Math.ceil(trendData.length / 5) !== 0) return null;
-            const x = paddingX + (i * (chartWidth - paddingX * 2) / (trendData.length - 1 || 1));
+          {activeData.map((d, i) => {
+            if (activeData.length > 7 && i % Math.ceil(activeData.length / 5) !== 0) return null;
+            const x = paddingX + (i * (chartWidth - paddingX * 2) / (activeData.length - 1 || 1));
             return (
               <text 
                 key={i} 
@@ -322,10 +401,10 @@ export function TrendChart({ trendData }) {
                 y={chartHeight - 4} 
                 textAnchor="middle" 
                 fill="var(--text-muted)" 
-                fontSize="7.5"
+                fontSize="7"
                 fontFamily="var(--font-body)"
               >
-                {d.tanggal}
+                {getLabel(d)}
               </text>
             );
           })}
@@ -336,19 +415,24 @@ export function TrendChart({ trendData }) {
 }
 
 export function TopList({ title, icon: Icon, data, type }) {
+  const displayData = React.useMemo(() => {
+    if (!data) return [];
+    return data.slice(0, 5);
+  }, [data]);
+
   return (
     <div className="glass-card" style={{ height: '100%' }}>
       <h3 className="widget-title">
         <Icon size={18} style={{ color: 'var(--color-secondary)' }} />
         {title}
       </h3>
-      {(!data || data.length === 0) ? (
+      {(!displayData || displayData.length === 0) ? (
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
           Belum ada data.
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {data.map((item, index) => {
+          {displayData.map((item, index) => {
             const name = type === 'customer' ? item.customer : item.produk;
             const extra = type === 'product' ? `${item.total_qty} Qty` : '';
             const value = item.total_omzet;

@@ -13,29 +13,37 @@ export async function GET() {
     const totalTarget = metricsResult[0]?.total_target || 0;
     const achievementPercent = totalTarget > 0 ? (totalOmzet / totalTarget) * 100 : 0;
 
-    // 2. Top Customers
+    // 2. Customers metrics
     const topCustomers = await query(
-      `SELECT c.name as customer, SUM(s.omzet) as total_omzet 
+      `SELECT c.name as customer, 
+              SUM(s.omzet) as total_omzet,
+              SUM(s.qty) as total_qty,
+              COUNT(s.id) as total_transactions
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
        GROUP BY s.customer_id 
-       ORDER BY total_omzet DESC 
-       LIMIT 5`
+       ORDER BY total_omzet DESC`
     );
 
-    // 3. Top Products (based on Omzet)
+    // 3. Products metrics
     const topProducts = await query(
-      `SELECT p.name as produk, SUM(s.qty) as total_qty, SUM(s.omzet) as total_omzet 
+      `SELECT p.name as produk, 
+              SUM(s.omzet) as total_omzet,
+              SUM(s.qty) as total_qty,
+              COUNT(s.id) as total_transactions
        FROM sales s
        JOIN products p ON s.product_id = p.id
        GROUP BY s.product_id 
-       ORDER BY total_omzet DESC 
-       LIMIT 5`
+       ORDER BY total_omzet DESC`
     );
 
-    // 4. Sales Performance (based on Omzet)
+    // 4. Sales Performance metrics
     const salesPerformance = await query(
-      `SELECT sl.name as sales, SUM(s.omzet) as total_omzet, sl.target as total_target 
+      `SELECT sl.name as sales, 
+              SUM(s.omzet) as total_omzet, 
+              sl.target as total_target,
+              SUM(s.qty) as total_qty,
+              COUNT(s.id) as total_transactions
        FROM salespeople sl
        LEFT JOIN sales s ON s.sales_id = sl.id
        GROUP BY sl.id 

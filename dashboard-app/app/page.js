@@ -345,9 +345,14 @@ export default function Dashboard() {
             <div className="glass-card">
               <h3 className="widget-title">
                 <BarChart3 size={18} style={{ color: 'var(--color-primary)' }} />
-                Tren Omzet Penjualan Harian
+                Grafik Analisis Penjualan Omzetra
               </h3>
-              <TrendChart trendData={data.salesTrend} />
+              <TrendChart 
+                trendData={data.salesTrend} 
+                productsData={data.topProducts}
+                salesData={data.salesPerformance}
+                customersData={data.topCustomers}
+              />
             </div>
 
             <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

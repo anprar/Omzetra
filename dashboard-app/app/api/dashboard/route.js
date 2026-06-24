@@ -200,7 +200,8 @@ export async function GET(request) {
 
     // 4. Customers metrics (Filtered)
     const topCustomers = await query(
-      `SELECT c.name as customer, 
+      `SELECT c.id as customer_id,
+              c.name as customer, 
               COALESCE(SUM(s.omzet), 0) as total_omzet,
               COALESCE(SUM(s.qty), 0) as total_qty,
               COUNT(s.id) as total_transactions
@@ -214,7 +215,8 @@ export async function GET(request) {
 
     // 5. Products metrics (Filtered)
     const topProducts = await query(
-      `SELECT p.name as produk, 
+      `SELECT p.id as product_id,
+              p.name as produk, 
               COALESCE(SUM(s.omzet), 0) as total_omzet,
               COALESCE(SUM(s.qty), 0) as total_qty,
               COUNT(s.id) as total_transactions
@@ -230,7 +232,8 @@ export async function GET(request) {
     // Note: Left join salespeople to see target even if filtered, but we filter sales records
     // Let's build a custom query that filters transactions first, then aggregates.
     const salesPerformance = await query(
-      `SELECT sl.name as sales, 
+      `SELECT sl.id as sales_id,
+              sl.name as sales, 
               COALESCE(SUM(s.omzet), 0) as total_omzet, 
               sl.target as total_target,
               COALESCE(SUM(s.qty), 0) as total_qty,

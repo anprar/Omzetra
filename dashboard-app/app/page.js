@@ -371,21 +371,21 @@ export default function Dashboard() {
 
       {/* GLOBAL FILTER BAR */}
       {hasData && (
-        <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1rem', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>
+        <div className="filter-bar-container">
+          <div className="filter-title-group">
             <Filter size={16} style={{ color: 'var(--color-primary)' }} />
             <span>FILTER ANALISIS</span>
           </div>
 
-          <div style={{ height: '20px', width: '1px', background: 'var(--border-color)', display: 'inline-block' }}></div>
+          <div className="filter-separator"></div>
 
           {/* Period Type Selection */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div className="filter-group">
             <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PERIODE</label>
             <select 
               value={periodType} 
               onChange={(e) => setPeriodType(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+              className="filter-select"
             >
               <option value="all">Semua Waktu</option>
               <option value="this-month">Bulan Ini</option>
@@ -397,80 +397,74 @@ export default function Dashboard() {
 
           {/* Custom Dates Inputs */}
           {periodType === 'custom' && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="filter-group">
                 <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>DARI TANGGAL</label>
                 <input 
                   type="date" 
                   value={startDate} 
                   onChange={(e) => setStartDate(e.target.value)}
-                  style={{ padding: '0.35rem 0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                  className="filter-select"
                 />
               </div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '12px' }}>s/d</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div className="filter-group">
                 <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>SAMPAI TANGGAL</label>
                 <input 
                   type="date" 
                   value={endDate} 
                   onChange={(e) => setEndDate(e.target.value)}
-                  style={{ padding: '0.35rem 0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                  className="filter-select"
                 />
               </div>
             </div>
           )}
 
           {/* Salesperson Filter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div className="filter-group">
             <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>SALESPERSON</label>
             <select 
               value={filterSalesId} 
               onChange={(e) => setFilterSalesId(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '130px' }}
+              className="filter-select"
+              style={{ minWidth: '130px' }}
             >
               <option value="">Semua Sales</option>
-              {data?.salesPerformance?.map(s => {
-                const cleanId = s.sales.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                return (
-                  <option key={s.sales} value={cleanId ? `SLS-${cleanId}` : ''}>{s.sales}</option>
-                );
-              })}
+              {data?.salesPerformance?.map(s => (
+                <option key={s.sales_id} value={s.sales_id}>{s.sales}</option>
+              ))}
             </select>
           </div>
 
           {/* Customer Filter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div className="filter-group">
             <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PELANGGAN</label>
             <select 
               value={filterCustomerId} 
               onChange={(e) => setFilterCustomerId(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '145px' }}
+              className="filter-select"
+              style={{ minWidth: '145px' }}
             >
               <option value="">Semua Pelanggan</option>
-              {data?.topCustomers?.map(c => {
-                const cleanId = c.customer.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                return (
-                  <option key={c.customer} value={cleanId ? `CST-${cleanId}` : ''}>{c.customer}</option>
-                );
-              })}
+              {data?.topCustomers?.map(c => (
+                <option key={c.customer_id} value={c.customer_id}>{c.customer}</option>
+              ))}
             </select>
           </div>
 
           {/* Product Filter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div className="filter-group">
             <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PRODUK</label>
             <select 
               value={filterProductId} 
               onChange={(e) => setFilterProductId(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '150px' }}
+              className="filter-select"
+              style={{ minWidth: '150px' }}
             >
               <option value="">Semua Produk</option>
-              {data?.topProducts?.map(p => {
-                const cleanId = p.produk.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                return (
-                  <option key={p.produk} value={cleanId ? `PRD-${cleanId}` : ''}>{p.produk}</option>
-                );
-              })}
+              {data?.topProducts?.map(p => (
+                <option key={p.product_id} value={p.product_id}>{p.produk}</option>
+              ))}
             </select>
           </div>
 
@@ -774,14 +768,14 @@ export default function Dashboard() {
 
           {/* Widget: Transaction History Table */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div className="tx-header">
               <h3 className="widget-title" style={{ marginBottom: 0 }}>
                 <FileSpreadsheet size={18} style={{ color: 'var(--color-primary)' }} />
                 Histori Transaksi Penjualan (Isi CSV/Excel)
               </h3>
               
               {/* Search Bar */}
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <div className="search-container">
                 <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
                 <input 
                   type="text" 

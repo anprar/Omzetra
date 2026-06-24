@@ -232,13 +232,9 @@ export function TrendChart({ trendData, productsData = [], salesData = [], custo
 
   const barWidth = Math.max(3, ((chartWidth - paddingX * 2) / activeData.length) * 0.6);
 
-  // Auto-switch to Bar Chart if dimension is categorical for better readability
+  // Always reset to Line Chart when the dimension changes
   React.useEffect(() => {
-    if (dimension !== 'tanggal') {
-      setChartType('bar');
-    } else {
-      setChartType('line');
-    }
+    setChartType('line');
   }, [dimension]);
 
   return (
@@ -491,61 +487,155 @@ export function TopList({ title, icon: Icon, data, type }) {
     return data.slice(0, 5);
   }, [data]);
 
+  // Find max value for the relative progress bar
+  const maxValue = React.useMemo(() => {
+    if (!displayData || displayData.length === 0) return 1;
+    return displayData[0].total_omzet || 1;
+  }, [displayData]);
+
   return (
-    <div className="glass-card" style={{ height: '100%' }}>
-      <h3 className="widget-title">
-        <Icon size={18} style={{ color: 'var(--color-secondary)' }} />
-        {title}
+    <div className="glass-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <h3 className="widget-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
+        <Icon size={18} style={{ color: 'var(--color-primary)' }} />
+        <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.02em' }}>{title}</span>
       </h3>
       {(!displayData || displayData.length === 0) ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '3rem 0', margin: 0 }}>
           Belum ada data.
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {displayData.map((item, index) => {
             const name = type === 'customer' ? item.customer : item.produk;
-            const extra = type === 'product' ? `${item.total_qty} Qty` : '';
             const value = item.total_omzet;
+            const qty = item.total_qty;
+            
+            // Percentage of the top item for the progress bar
+            const percentOfMax = maxValue > 0 ? (value / maxValue) * 100 : 0;
+
+            // Rank badges styling
+            let badgeStyle = {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              fontSize: '0.8rem',
+              fontWeight: '700',
+              flexShrink: 0,
+              boxShadow: 'var(--shadow-sm)'
+            };
+
+            if (index === 0) {
+              // Gold rank
+              badgeStyle = {
+                ...badgeStyle,
+                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                color: '#1e1b4b',
+                boxShadow: '0 0 10px rgba(251, 191, 36, 0.4)'
+              };
+            } else if (index === 1) {
+              // Silver rank
+              badgeStyle = {
+                ...badgeStyle,
+                background: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+                color: '#0f172a',
+                boxShadow: '0 0 8px rgba(148, 163, 184, 0.3)'
+              };
+            } else if (index === 2) {
+              // Bronze rank
+              badgeStyle = {
+                ...badgeStyle,
+                background: 'linear-gradient(135deg, #ffedd5 0%, #c2410c 100%)',
+                color: '#fff',
+                boxShadow: '0 0 8px rgba(194, 65, 12, 0.3)'
+              };
+            } else {
+              // Regular rank
+              badgeStyle = {
+                ...badgeStyle,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)'
+              };
+            }
 
             return (
               <div 
                 key={index} 
+                className="top-list-item"
                 style={{ 
                   display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  padding: '0.75rem 1rem', 
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  padding: '0.85rem 1rem', 
                   background: 'rgba(255, 255, 255, 0.02)', 
                   border: '1px solid var(--border-color)', 
                   borderRadius: 'var(--radius-md)',
-                  transition: 'border-color 0.2s',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  cursor: 'default'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    width: '24px', 
-                    height: '24px', 
-                    borderRadius: '50%', 
-                    background: index === 0 ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.05)',
-                    color: index === 0 ? '#fff' : 'var(--text-secondary)',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-                  }}>
-                    {index + 1}
+                {/* Background progress bar to indicate rank volume relative to top */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  bottom: 0,
+                  height: '3px',
+                  width: `${percentOfMax}%`,
+                  background: index === 0 
+                    ? 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%)' 
+                    : 'rgba(139, 92, 246, 0.3)',
+                  opacity: 0.75,
+                  transition: 'width 0.5s ease-out'
+                }}></div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={badgeStyle}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{name}</div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.15rem' }}>
+                        {/* Transaction Count Badge */}
+                        <span style={{ 
+                          fontSize: '0.7rem', 
+                          color: 'var(--text-muted)',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255, 255, 255, 0.05)'
+                        }}>
+                          {item.total_transactions} Trx
+                        </span>
+
+                        {/* Qty Badge */}
+                        {qty > 0 && (
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            color: 'var(--color-secondary)',
+                            background: 'var(--color-secondary-glow)',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(6, 182, 212, 0.15)',
+                            fontWeight: 600
+                          }}>
+                            {qty} Qty
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{name}</div>
-                    {extra && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{extra}</div>}
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                      {formatRupiah(value)}
+                    </div>
                   </div>
-                </div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                  {formatRupiah(value)}
                 </div>
               </div>
             );

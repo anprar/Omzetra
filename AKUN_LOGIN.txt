@@ -1,0 +1,39 @@
+================================================================================
+INFORMASI AKUN LOGIN - OMZETRA DASHBOARD
+================================================================================
+
+Berikut adalah daftar username dan password bawaan (default) yang telah ditanamkan 
+ke dalam database sistem (sales.db) melalui database seeder untuk keperluan 
+demonstrasi dan presentasi:
+
+--------------------------------------------------------------------------------
+1. AKUN ADMINISTRATOR (Akses Penuh + Admin Control Panel)
+--------------------------------------------------------------------------------
+* Username : admin
+* Password : adminomzetra
+* Fitur Khusus:
+  - Melihat visualisasi KPI, grafik interaktif, dan AI insights strategis.
+  - Mengakses menu "Settings" (Admin Control Panel) di pojok kanan atas.
+  - Mengubah target penjualan sales (inline target editing) secara dinamis.
+  - Menyesuaikan harga satuan produk master secara dinamis.
+  - Melakukan "Reset Data Penjualan" (menghapus transaksi tanpa menghapus akun).
+  - Melakukan "Reset Akun User" (mengembalikan daftar pengguna ke default).
+  - Menambahkan user baru ke sistem database.
+
+--------------------------------------------------------------------------------
+2. AKUN REGULAR USER (Akses Dashboard & Upload)
+--------------------------------------------------------------------------------
+* Username : user
+* Password : 12345
+* Fitur Khusus:
+  - Melihat visualisasi KPI, grafik interaktif, dan AI insights strategis.
+  - Mengunggah file laporan bulanan baru (Excel/CSV/Google Sheets).
+  - Mengakses dan menyaring tabel histori transaksi penjualan.
+  - *Catatan: Tidak dapat mengakses Admin Control Panel (Settings).*
+
+================================================================================
+CATATAN KEAMANAN PRODUKSI:
+Pada implementasi nyata di server produksi, password wajib dienkripsi/di-hash 
+menggunakan pustaka keamanan seperti 'bcrypt' sebelum disimpan ke database, serta 
+disediakan fitur registrasi mandiri atau manajemen otorisasi berstandar industri.
+================================================================================

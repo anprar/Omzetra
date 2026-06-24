@@ -51,7 +51,8 @@ function generateSlug(prefix, name) {
 export async function POST(request) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file');
+    const files = formData.getAll('files');
+    const singleFile = formData.get('file');
     const sheetUrl = formData.get('sheetUrl');
     
     let rows = [];
@@ -69,33 +70,42 @@ export async function POST(request) {
       }
       const text = await res.text();
       rows = parseCSV(text);
-    } else if (file) {
-      // Import from File (CSV or Excel)
-      const fileName = file.name.toLowerCase();
-      
-      if (fileName.endsWith('.csv')) {
-        const text = await file.text();
-        rows = parseCSV(text);
-      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-        
-        // Normalize headers to lowercase
-        rows = rawRows.map(row => {
-          const normalized = {};
-          Object.keys(row).forEach(key => {
-            normalized[key.trim().toLowerCase()] = row[key].toString().trim();
-          });
-          return normalized;
-        });
-      } else {
-        return NextResponse.json({ error: 'Format file tidak didukung. Gunakan .csv, .xlsx, atau .xls' }, { status: 400 });
-      }
     } else {
-      return NextResponse.json({ error: 'File atau link Google Sheets wajib disertakan' }, { status: 400 });
+      // Gather files to process
+      const filesToProcess = files && files.length > 0 ? files : (singleFile ? [singleFile] : []);
+      
+      if (filesToProcess.length === 0) {
+        return NextResponse.json({ error: 'File atau link Google Sheets wajib disertakan' }, { status: 400 });
+      }
+      
+      for (const file of filesToProcess) {
+        const fileName = file.name.toLowerCase();
+        let fileRows = [];
+        
+        if (fileName.endsWith('.csv')) {
+          const text = await file.text();
+          fileRows = parseCSV(text);
+        } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          
+          // Normalize headers to lowercase
+          fileRows = rawRows.map(row => {
+            const normalized = {};
+            Object.keys(row).forEach(key => {
+              normalized[key.trim().toLowerCase()] = row[key].toString().trim();
+            });
+            return normalized;
+          });
+        } else {
+          return NextResponse.json({ error: `Format file ${file.name} tidak didukung. Gunakan .csv, .xlsx, atau .xls` }, { status: 400 });
+        }
+        
+        rows = rows.concat(fileRows);
+      }
     }
     
     if (rows.length === 0) {
